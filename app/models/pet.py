@@ -50,3 +50,6 @@ class Pet(Base):
 
     # Relación con el modelo Owner: permite acceder a los datos del propietario desde la mascota
     owner = relationship("Owner", backref="mascotas")
+
+    # Relación con historia clínica
+    historia_clinica = relationship("MedicalHistory", back_populates="mascota", uselist=False)

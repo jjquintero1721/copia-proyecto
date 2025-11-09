@@ -148,3 +148,16 @@ def verify_owner_or_staff(
         )
 
     return current_user
+
+def require_veterinarian_or_admin(
+    current_user: User = Depends(get_current_active_user)
+) -> User:
+    """
+    Requiere que el usuario sea veterinario o superadmin
+    """
+    if current_user.rol.value not in [UserRoles.VETERINARIO, UserRoles.SUPERADMIN]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Acceso denegado. Se requiere rol de veterinario o superadmin."
+        )
+    return current_user

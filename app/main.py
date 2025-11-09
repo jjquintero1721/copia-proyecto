@@ -39,6 +39,7 @@ app.add_middleware(
 from app.controllers import auth_controller, user_controller
 from app.controllers import patient_controller
 from app.controllers import appointment_controller, service_controller
+from app.controllers import medical_history_controller
 
 # Registrar rutas
 app.include_router(
@@ -71,6 +72,12 @@ app.include_router(
     appointment_controller.router,
     prefix="/api/v1/appointments",
     tags=["Citas"]
+)
+
+app.include_router(
+    medical_history_controller.router,
+    prefix="/api/v1/medical-history",
+    tags=["Historias Clínicas"]
 )
 
 

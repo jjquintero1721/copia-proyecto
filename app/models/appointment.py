@@ -45,6 +45,9 @@ class Appointment(Base):
     servicio_id = Column(UUID(as_uuid=True), ForeignKey("servicios.id"),
                         nullable=False, index=True)
 
+    # Relación con consultas
+    consultas = relationship("Consultation", back_populates="cita")
+
     # Fecha y hora de la cita
     fecha_hora = Column(DateTime, nullable=False, index=True)
 
