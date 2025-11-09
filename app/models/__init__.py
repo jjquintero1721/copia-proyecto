@@ -1,0 +1,15 @@
+"""
+Modelos de base de datos (SQLAlchemy ORM)
+Cada modelo representa una tabla en la base de datos
+"""
+"""
+Modelos de base de datos (SQLAlchemy ORM)
+Cada modelo representa una tabla en la base de datos
+"""
+
+from app.models.user import User, UserRole
+from app.models.owner import Owner
+from app.models.pet import Pet
+from app.models.medical_history import MedicalHistory
+from app.models.service import Service  # ← NUEVO
+from app.models.appointment import Appointment, AppointmentStatus  # ← NUEVO
