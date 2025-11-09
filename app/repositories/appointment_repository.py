@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_
 from typing import Optional, List
 from uuid import UUID
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from app.models.appointment import Appointment, AppointmentStatus
 
@@ -146,7 +146,7 @@ class AppointmentRepository:
         Obtiene citas próximas para recordatorios
         RF-06: Notificaciones por correo
         """
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         target_time = now + timedelta(hours=hours_ahead)
 
         return self.db.query(Appointment).filter(

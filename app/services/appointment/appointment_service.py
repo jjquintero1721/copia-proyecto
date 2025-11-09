@@ -26,6 +26,7 @@ class AppointmentService:
     Servicio principal de gestión de citas
     Implementa patrones: State, Strategy, Observer, Template Method
     """
+    CITA_NOT_FOUND_MSG = "Cita no encontrado"
 
     def __init__(self, db: Session):
         self.db = db
@@ -172,7 +173,7 @@ class AppointmentService:
         # Obtener cita
         appointment = self.repository.get_by_id(appointment_id)
         if not appointment:
-            raise ValueError("Cita no encontrada")
+            raise ValueError(self.CITA_NOT_FOUND_MSG)
 
         # Validar anticipación con Strategy Pattern
         gestor = GestorAgendamiento(PoliticaReprogramacion())
@@ -232,7 +233,7 @@ class AppointmentService:
         """
         appointment = self.repository.get_by_id(appointment_id)
         if not appointment:
-            raise ValueError("Cita no encontrada")
+            raise ValueError(self.CITA_NOT_FOUND_MSG)
 
         try:
             # Confirmar usando State Pattern
@@ -273,7 +274,7 @@ class AppointmentService:
         """
         appointment = self.repository.get_by_id(appointment_id)
         if not appointment:
-            raise ValueError("Cita no encontrada")
+            raise ValueError(self.CITA_NOT_FOUND_MSG)
 
         try:
             # Cancelar usando State Pattern (detecta cancelación tardía)

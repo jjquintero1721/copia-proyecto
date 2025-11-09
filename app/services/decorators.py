@@ -1,5 +1,5 @@
 from typing import Any
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 class AuditDecorator:
@@ -23,9 +23,9 @@ class AuditDecorator:
         Ejecuta el método `execute()` del servicio decorado,
         midiendo su tiempo de ejecución y registrando información de auditoría básica.
         """
-        started = datetime.utcnow()  # Marca de tiempo antes de ejecutar
+        started = datetime.now(timezone.utc)  # Marca de tiempo antes de ejecutar
         entity = self._service.execute()  # Ejecuta el servicio original
-        finished = datetime.utcnow()  # Marca de tiempo después de ejecutar
+        finished = datetime.now(timezone.utc)  # Marca de tiempo después de ejecutar
 
         # Auditoría simple (placeholder): muestra tiempo y entidad procesada
         # En un entorno real, esto podría guardarse en una tabla o sistema de logs

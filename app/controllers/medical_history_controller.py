@@ -31,6 +31,8 @@ from app.commands.medical_history_commands import (
 
 router = APIRouter()
 
+ID_CONSULTA_MSG = "ID de la consulta"
+
 
 # ==================== CONSULTAS ====================
 
@@ -82,7 +84,7 @@ async def create_consultation(
 
 @router.get("/consultas/{consultation_id}", response_model=dict)
 async def get_consultation(
-    consultation_id: UUID = Path(..., description="ID de la consulta"),
+    consultation_id: UUID = Path(..., description=ID_CONSULTA_MSG),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
@@ -118,7 +120,7 @@ async def get_consultation(
 
 @router.put("/consultas/{consultation_id}", response_model=dict)
 async def update_consultation(
-    consultation_id: UUID = Path(..., description="ID de la consulta"),
+    consultation_id: UUID = Path(..., description=ID_CONSULTA_MSG),
     update_data: ConsultationUpdate = ...,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_staff)
@@ -160,7 +162,7 @@ async def update_consultation(
 
 @router.get("/consultas/{consultation_id}/historial", response_model=dict)
 async def get_consultation_history(
-    consultation_id: UUID = Path(..., description="ID de la consulta"),
+    consultation_id: UUID = Path(..., description=ID_CONSULTA_MSG),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
     db: Session = Depends(get_db),

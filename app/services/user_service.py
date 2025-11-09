@@ -6,7 +6,7 @@ Implementa patrones: Factory Method, Builder, Template Method
 from sqlalchemy.orm import Session
 from typing import Optional, List, Dict, Any
 from uuid import UUID
-from datetime import datetime
+from datetime import datetime , timezone
 from abc import ABC, abstractmethod
 
 from app.models.user import User, UserRole
@@ -171,6 +171,8 @@ class UserService(BaseCRUDService):
     Implementa Template Method y coordina las factories
     """
 
+    USER_NOT_FOUND_MSG = "Usuario no encontrado"
+
     def __init__(self, db: Session):
         self.db = db
         repository = UserRepository(db)
@@ -251,7 +253,7 @@ class UserService(BaseCRUDService):
         """Actualiza un usuario existente"""
         user = self.repository.get_by_id(user_id)
         if not user:
-            raise ValueError("Usuario no encontrado")
+            raise ValueError(self.USER_NOT_FOUND_MSG)
 
         # Actualizar solo campos proporcionados
         if user_data.nombre is not None:
@@ -261,7 +263,7 @@ class UserService(BaseCRUDService):
         if user_data.activo is not None:
             user.activo = user_data.activo
 
-        user.fecha_actualizacion = datetime.utcnow()
+        user.fecha_actualizacion = datetime.now(timezone.utc)
 
         return self.repository.update(user)
 
@@ -269,7 +271,7 @@ class UserService(BaseCRUDService):
         """Cambia la contraseña de un usuario"""
         user = self.repository.get_by_id(user_id)
         if not user:
-            raise ValueError("Usuario no encontrado")
+            raise ValueError(self.USER_NOT_FOUND_MSG)
 
         # Verificar contraseña actual
         if not verify_password(password_data.contrasena_actual, user.contrasena_hash):
@@ -277,7 +279,7 @@ class UserService(BaseCRUDService):
 
         # Establecer nueva contraseña
         user.contrasena_hash = get_password_hash(password_data.contrasena_nueva)
-        user.fecha_actualizacion = datetime.utcnow()
+        user.fecha_actualizacion = datetime.now(timezone.utc)
 
         return self.repository.update(user)
 
@@ -285,7 +287,7 @@ class UserService(BaseCRUDService):
         """Desactiva un usuario (borrado lógico)"""
         user = self.repository.get_by_id(user_id)
         if not user:
-            raise ValueError("Usuario no encontrado")
+            raise ValueError(self.USER_NOT_FOUND_MSG)
 
         return self.repository.soft_delete(user)
 

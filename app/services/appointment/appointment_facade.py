@@ -186,7 +186,7 @@ class AppointmentFacade:
         fin_jornada = fecha.replace(hour=18, minute=0, second=0, microsecond=0)
 
         # Obtener citas del día
-        citas_dia = self.appointment_service.repository.get_by_date_range(
+        self.appointment_service.repository.get_by_date_range(
             inicio_jornada,
             fin_jornada,
             veterinario_id

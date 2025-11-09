@@ -48,17 +48,17 @@ class NotificadorCorreo(AppointmentObserver):
             print(f"   → Fecha: {cita.fecha_hora}")
 
         elif evento == "CITA_REPROGRAMADA":
-            print(f"   → Notificación de reprogramación")
+            print("   → Notificación de reprogramación")
             print(f"   → Nueva fecha: {cita.fecha_hora}")
 
         elif evento == "CITA_CANCELADA":
             if cita.cancelacion_tardia:
-                print(f"   → Notificación de cancelación tardía")
+                print("   → Notificación de cancelación tardía")
             else:
-                print(f"   → Notificación de cancelación")
+                print("   → Notificación de cancelación")
 
         elif evento == "RECORDATORIO_CITA":
-            print(f"   → Recordatorio de cita para mañana")
+            print("   → Recordatorio de cita para mañana")
 
 
 class RegistroAuditoria(AppointmentObserver):

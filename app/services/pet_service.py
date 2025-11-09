@@ -1,3 +1,10 @@
+"""
+Servicio de creación de mascotas - Implementa Template Method Pattern
+RF-04: Registro de mascotas con creación automática de historia clínica
+RN06: Mascota vinculada a propietario
+RN07: No duplicar nombre+especie por propietario
+"""
+
 from typing import Optional
 from uuid import UUID
 from datetime import date
@@ -9,6 +16,7 @@ from app.services.factory import EntityFactory
 from app.repositories.pet_repository import PetRepository
 from app.models.pet import Pet
 from app.models.medical_history import MedicalHistory
+from app.utils.medical_history_number_generator import MedicalHistoryNumberGenerator
 
 
 class CreatePetService(CreateTemplate):
@@ -85,8 +93,20 @@ class CreatePetService(CreateTemplate):
         """
         Paso posterior (Template Method).
         Crea automáticamente una historia clínica (MedicalHistory) asociada
-        a la mascota recién creada.
+        a la mascota recién creada con número único generado.
+
+        RF-04: Creación automática de historia clínica
+        Formato del número: HC-YYYY-XXXX
         """
-        mh = MedicalHistory(mascota_id=entity.id)
+        # Generar número único para la historia clínica
+        numero_historia = MedicalHistoryNumberGenerator.generate(self.db)
+
+        # Crear historia clínica con número generado
+        mh = MedicalHistory(
+            mascota_id=entity.id,
+            numero=numero_historia
+        )
+
         self.db.add(mh)
         self.db.commit()
+        self.db.refresh(mh)
