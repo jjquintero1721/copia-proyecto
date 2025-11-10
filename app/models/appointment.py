@@ -73,6 +73,7 @@ class Appointment(Base):
     mascota = relationship("Pet", backref="citas")
     veterinario = relationship("User", foreign_keys=[veterinario_id], backref="citas_veterinario")
     servicio = relationship("Service", backref="citas")
+    triage = relationship("Triage", back_populates="cita", uselist=False)
 
     def __repr__(self):
         return f"<Cita {self.fecha_hora} - {self.estado.value}>"

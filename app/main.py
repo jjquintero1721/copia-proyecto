@@ -36,10 +36,15 @@ app.add_middleware(
 )
 
 # Importar controladores
-from app.controllers import auth_controller, user_controller
-from app.controllers import patient_controller
-from app.controllers import appointment_controller, service_controller
-from app.controllers import medical_history_controller
+from app.controllers import (
+user_controller,
+service_controller,
+triage_controller,
+auth_controller,
+patient_controller,
+medical_history_controller,
+appointment_controller
+)
 
 # Registrar rutas
 app.include_router(
@@ -80,6 +85,11 @@ app.include_router(
     tags=["Historias Clínicas"]
 )
 
+app.include_router(
+    triage_controller.router,
+    prefix="/api/v1/triage",
+    tags=["Triage"]
+)
 
 # Endpoint raíz
 @app.get("/")

@@ -12,4 +12,6 @@ from app.models.owner import Owner
 from app.models.pet import Pet
 from app.models.medical_history import MedicalHistory
 from app.models.service import Service  # ← NUEVO
-from app.models.appointment import Appointment, AppointmentStatus  # ← NUEVO
+from app.models.appointment import Appointment, AppointmentStatus
+from app.models.triage import Triage, TriagePriority, TriageGeneralState
+# ← NUEVO
