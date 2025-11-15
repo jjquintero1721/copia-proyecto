@@ -4,7 +4,7 @@ RF-07: Gestión de historias clínicas
 RN10-2: Cada modificación registra fecha, hora y usuario
 """
 
-from sqlalchemy import Column, String, DateTime, ForeignKey, Integer, Text
+from sqlalchemy import Column, String, DateTime, ForeignKey, Integer, Text, Boolean
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from datetime import datetime, timezone

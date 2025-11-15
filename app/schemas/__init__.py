@@ -10,3 +10,9 @@ from app.schemas.triage_schema import (
     TriageGeneralStateEnum,
     DolorEnum
 )
+from app.schemas.follow_up_schema import (
+    FollowUpCreate,
+    FollowUpResponse,
+    FollowUpListResponse,
+    FollowUpCompletionCreate
+)

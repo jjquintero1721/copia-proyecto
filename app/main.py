@@ -45,6 +45,7 @@ patient_controller,
 medical_history_controller,
 appointment_controller,
 inventory_controller,
+follow_up_controller,
 )
 
 # Registrar rutas
@@ -96,6 +97,12 @@ app.include_router(
     inventory_controller.router,
     prefix="/api/v1/inventory",
     tags=["Inventario"]
+)
+
+app.include_router(
+    follow_up_controller.router,
+    prefix="/api/v1/follow-up",
+    tags=["Seguimiento de Pacientes"]
 )
 
 # Endpoint raíz
