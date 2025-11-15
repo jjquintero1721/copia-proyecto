@@ -14,4 +14,5 @@ from app.models.medical_history import MedicalHistory
 from app.models.service import Service  # ← NUEVO
 from app.models.appointment import Appointment, AppointmentStatus
 from app.models.triage import Triage, TriagePriority, TriageGeneralState
-# ← NUEVO
+from app.models.medication import Medication, MedicationType, MedicationUnit
+from app.models.inventory_movement import InventoryMovement, MovementType

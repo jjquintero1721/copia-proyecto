@@ -18,6 +18,7 @@ from app.repositories.consultation_repository import ConsultationRepository
 from app.repositories.medical_history_repository import MedicalHistoryRepository
 from app.schemas.consultation_schema import ConsultationCreate, ConsultationUpdate
 from app.services.medical_history.consultation_builder import ConsultationBuilder
+from app.services.inventory.inventory_facade import InventoryFacade
 
 
 class MedicalHistoryService:
@@ -291,3 +292,27 @@ class MedicalHistoryService:
         consultation.fecha_actualizacion = datetime.now(timezone.utc)
 
         return self.consultation_repo.update(consultation)
+
+    def completar_consulta_con_medicamentos(
+            self,
+            consulta_id: UUID,
+            medicamentos_usados: List[Dict[str, Any]],
+            usuario_id: UUID
+    ) -> None:
+        """
+        Completa una consulta y descuenta medicamentos del inventario
+        Integración con módulo de Inventario mediante Facade Pattern
+        """
+        # Validar que la consulta exista
+        consulta = self.consultation_repo.get_by_id(consulta_id)
+        if not consulta:
+            raise ValueError("Consulta no encontrada")
+
+        # Registrar uso de medicamentos
+        if medicamentos_usados:
+            inventory_facade = InventoryFacade(self.db)
+            movimientos = inventory_facade.registrar_uso_en_consulta(
+                medicamentos_usados=medicamentos_usados,
+                consulta_id=consulta_id,
+                usuario_id=usuario_id
+            )

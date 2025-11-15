@@ -43,7 +43,8 @@ triage_controller,
 auth_controller,
 patient_controller,
 medical_history_controller,
-appointment_controller
+appointment_controller,
+inventory_controller,
 )
 
 # Registrar rutas
@@ -89,6 +90,12 @@ app.include_router(
     triage_controller.router,
     prefix="/api/v1/triage",
     tags=["Triage"]
+)
+
+app.include_router(
+    inventory_controller.router,
+    prefix="/api/v1/inventory",
+    tags=["Inventario"]
 )
 
 # Endpoint raíz
