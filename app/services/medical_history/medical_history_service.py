@@ -32,6 +32,8 @@ class MedicalHistoryService:
         self.consultation_repo = ConsultationRepository(db)
         self.medical_history_repo = MedicalHistoryRepository(db)
 
+    CONSULTA_NOT_FOUND_MSG = "Consulta no encontrado"
+
     # ==================== CONSULTAS ====================
 
     def create_consultation(
@@ -119,7 +121,7 @@ class MedicalHistoryService:
         # Obtener consulta actual
         consultation = self.consultation_repo.get_by_id(consultation_id)
         if not consultation:
-            raise ValueError("Consulta no encontrada")
+            raise ValueError(self.CONSULTA_NOT_FOUND_MSG)
 
         # Guardar memento antes de actualizar (Memento Pattern)
         nueva_version = consultation.version + 1
@@ -306,7 +308,7 @@ class MedicalHistoryService:
         # Validar que la consulta exista
         consulta = self.consultation_repo.get_by_id(consulta_id)
         if not consulta:
-            raise ValueError("Consulta no encontrada")
+            raise ValueError(self.CONSULTA_NOT_FOUND_MSG)
 
         # Registrar uso de medicamentos
         if medicamentos_usados:

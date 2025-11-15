@@ -53,13 +53,13 @@ class AlertaBajoStock(InventoryObserver):
         elif evento == "STOCK_ACTUALIZADO":
             self._verificar_stock(medication, datos)
 
-    def _generar_alerta_stock_bajo(self, medication: Medication, datos: Dict[str, Any]) -> None:
+    def _generar_alerta_stock_bajo(self, medication: Medication, _datos: Dict[str, Any]) -> None:
         """Genera alerta cuando el stock está bajo"""
         print(f"⚠️  [ALERTA STOCK BAJO] {medication.nombre}")
         print(f"   → Stock actual: {medication.stock_actual} {medication.unidad_medida.value}")
         print(f"   → Stock mínimo: {medication.stock_minimo} {medication.unidad_medida.value}")
         print(f"   → Tipo: {medication.tipo.value}")
-        print(f"   → Requiere reabastecimiento URGENTE")
+        print("   → Requiere reabastecimiento URGENTE")
 
         # En producción, aquí se enviaría:
         # 1. Email a administradores
@@ -67,15 +67,15 @@ class AlertaBajoStock(InventoryObserver):
         # 3. Registro en tabla de alertas
         # 4. Webhook a sistema de compras
 
-    def _generar_alerta_critica(self, medication: Medication, datos: Dict[str, Any]) -> None:
+    def _generar_alerta_critica(self, medication: Medication, _datos: Dict[str, Any]) -> None:
         """Genera alerta crítica cuando el stock es 0 o muy bajo"""
         print(f"🚨 [ALERTA CRÍTICA] {medication.nombre} - STOCK AGOTADO O CRÍTICO")
         print(f"   → Stock actual: {medication.stock_actual}")
-        print(f"   → Se requiere compra INMEDIATA")
+        print("   → Se requiere compra INMEDIATA")
         print(f"   → Tipo: {medication.tipo.value}")
 
         if medication.stock_actual == 0:
-            print(f"   → ⚠️  MEDICAMENTO AGOTADO - Sin existencias")
+            print("   → ⚠️  MEDICAMENTO AGOTADO - Sin existencias")
 
     def _verificar_stock(self, medication: Medication, datos: Dict[str, Any]) -> None:
         """Verifica el nivel de stock después de una actualización"""
@@ -129,7 +129,7 @@ class NotificadorVencimiento(InventoryObserver):
             print(f"❌ [Medicamento Vencido] {medication.nombre}")
             print(f"   → Fecha de vencimiento: {medication.fecha_vencimiento}")
             print(f"   → Lote: {medication.lote}")
-            print(f"   → Acción requerida: Retirar del inventario")
+            print("   → Acción requerida: Retirar del inventario")
 
 
 class MetricasInventario(InventoryObserver):
