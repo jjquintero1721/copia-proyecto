@@ -71,31 +71,34 @@ class CacheProxy:
             fecha: date,
             veterinario_id: Optional[UUID] = None
     ) -> List[Appointment]:
-        """
-        Obtiene citas de una fecha específica usando caché
+        """Obtiene citas usando caché"""
 
-        Flujo:
-        1. Verificar caché
-        2. Si existe y es válido, retornar
-        3. Si no, consultar servicio real
-        4. Almacenar en caché y retornar
-        """
         # Generar clave de caché
         cache_key = self._generate_cache_key(fecha, veterinario_id)
+
+        # ✅ AGREGAR LOG AQUÍ
+        logger.info(f"🔍 Buscando en caché: {cache_key}")
 
         # Intentar obtener del caché
         cached_data = self._get_from_cache(cache_key)
 
         if cached_data is not None:
-            logger.debug(f"Cache HIT para fecha {fecha}")
-            return self._deserialize_appointments(cached_data)
+            # ✅ AGREGAR LOG AQUÍ
+            logger.info(f"✅ Cache HIT para {cache_key}")
+            appointments = self._deserialize_appointments(cached_data)
+            return appointments
 
-        # Cache MISS - consultar servicio real
-        logger.debug(f"Cache MISS para fecha {fecha}")
-        appointments = self._real_service.get_appointments_by_date(fecha, veterinario_id)
+        # ✅ AGREGAR LOG AQUÍ
+        logger.info(f"❌ Cache MISS para {cache_key} - consultando BD")
+
+        # Cache miss - consultar servicio real
+        appointments = self._real_service.get_appointments_by_date(
+            fecha, veterinario_id
+        )
 
         # Guardar en caché
         self._save_to_cache(cache_key, appointments)
+        logger.info(f"💾 Guardado en caché: {cache_key} ({len(appointments)} citas)")
 
         return appointments
 

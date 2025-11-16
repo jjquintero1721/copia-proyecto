@@ -10,6 +10,8 @@ from app.database import get_db
 from app.services.user_service import UserService
 from app.schemas.user_schema import UserCreate, LoginRequest, LoginResponse, UserResponse
 from app.utils.responses import success_response, error_response
+from app.services.proxies import ProxyFactory
+
 
 router = APIRouter()
 
@@ -21,20 +23,10 @@ async def register(
 ):
     """
     Registra un nuevo usuario en el sistema
-
-    **Roles disponibles:**
-    - superadmin: Acceso total al sistema
-    - veterinario: Gestión de historias clínicas, citas, inventario
-    - auxiliar: Apoyo en citas y triage
-    - propietario: Solo mascotas y citas propias
-
-    **Validaciones:**
-    - Correo único (RN01)
-    - Contraseña mínimo 8 caracteres, 1 número, 1 mayúscula
-    - Teléfono opcional
     """
     try:
-        service = UserService(db)
+        # ✅ USAR PROXY
+        service = ProxyFactory.create_user_service_with_auth(db)
         user = service.create_user(user_data)
 
         return success_response(
@@ -54,7 +46,6 @@ async def register(
             detail=f"Error al registrar usuario: {str(exc)}"
         )
 
-
 @router.post("/login", response_model=dict)
 async def login(
         credentials: LoginRequest,
@@ -62,18 +53,10 @@ async def login(
 ):
     """
     Autentica un usuario y retorna un token JWT
-
-    **Uso del token:**
-    - Incluir en header: `Authorization: Bearer <token>`
-    - Válido por 30 minutos (configurable en .env)
-
-    **Respuesta:**
-    - access_token: Token JWT
-    - token_type: Tipo de token (bearer)
-    - usuario: Datos del usuario autenticado
     """
     try:
-        service = UserService(db)
+        # ✅ USAR PROXY en lugar de servicio directo
+        service = ProxyFactory.create_user_service_with_auth(db)
         result = service.authenticate(credentials.correo, credentials.contrasena)
 
         if not result:

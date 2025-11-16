@@ -145,3 +145,33 @@ class ProxyFactory:
             f"para {current_user.correo}"
         )
         return auth_proxy
+
+    @staticmethod
+    def create_user_service_with_auth(
+            db: Session,
+            audit_callback: Optional[Callable] = None
+    ) -> Any:
+        """
+        Crea UserService envuelto en UserAuthProxy
+
+        Args:
+            db: Sesión de base de datos
+            audit_callback: Función opcional para auditoría
+
+        Returns:
+            UserAuthProxy que envuelve UserService
+        """
+        from app.services.user_service import UserService
+        from .user_auth_proxy import UserAuthProxy
+
+        # Crear servicio real
+        real_service = UserService(db)
+
+        # Envolver en proxy de autenticación
+        auth_proxy = UserAuthProxy(
+            real_service=real_service,
+            audit_callback=audit_callback
+        )
+
+        logger.info("UserService creado con UserAuthProxy")
+        return auth_proxy

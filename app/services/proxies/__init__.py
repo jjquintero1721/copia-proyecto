@@ -24,6 +24,7 @@ from .cache_proxy import CacheProxy
 from .auth_proxy import AuthProxy, PermissionDeniedException
 from .proxy_factory import ProxyFactory
 from .redis_config import get_redis_client, is_redis_available
+from .user_auth_proxy import UserAuthProxy
 
 __all__ = [
     'AppointmentServiceInterface',
@@ -32,5 +33,6 @@ __all__ = [
     'PermissionDeniedException',
     'ProxyFactory',
     'get_redis_client',
-    'is_redis_available'
+    'is_redis_available',
+    'UserAuthProxy',
 ]

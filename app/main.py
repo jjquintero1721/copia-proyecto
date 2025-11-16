@@ -2,6 +2,7 @@
 Punto de entrada principal de la aplicación FastAPI
 Sistema de Gestión de Clínica Veterinaria (GDCV)
 """
+import logging
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -14,6 +15,14 @@ import app.models  # asegura registro de modelos
 # Cargar variables de entorno
 load_dotenv(encoding="latin-1")
 
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+
+# Configurar logger específico para proxies
+logging.getLogger('app.services.proxies').setLevel(logging.INFO)
+logging.getLogger('app.services').setLevel(logging.INFO)
 # Crear instancia de FastAPI
 app = FastAPI(
     title=os.getenv("APP_NAME", "Sistema GDCV"),
