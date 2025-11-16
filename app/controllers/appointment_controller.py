@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from uuid import UUID
-from datetime import datetime
+from datetime import datetime, date
 
 from app.database import get_db
 from app.services.appointment.appointment_service import AppointmentService
@@ -18,6 +18,7 @@ from app.schemas.appointment_schema import (
     AppointmentResponse,
     AppointmentStatusEnum
 )
+from app.services.proxies import ProxyFactory, PermissionDeniedException
 from app.models.user import User
 from app.models.appointment import AppointmentStatus
 from app.security.dependencies import (
@@ -43,17 +44,6 @@ async def create_appointment(
 ):
     """
     Agenda una nueva cita
-
-    **Requiere:** Token JWT válido
-    **Acceso:** Staff (Superadmin, Veterinario, Auxiliar)
-
-    **RF-05:** Gestión de citas
-    **RN08-1:** Anticipación mínima de 4 horas
-
-    **Validaciones:**
-    - Mascota, veterinario y servicio deben existir
-    - Anticipación mínima de 4 horas
-    - Veterinario debe estar disponible en el horario
     """
     try:
         cmd = CreateAppointmentCommand(
@@ -100,26 +90,17 @@ async def list_appointments(
 ):
     """
     Lista todas las citas con filtros opcionales
-
-    **Requiere:** Token JWT válido
-    **Acceso:**
-    - Staff: Puede ver todas las citas
-    - Propietario: Solo puede ver citas de sus mascotas (implementar filtro)
-
-    **Filtros:**
-    - estado: Estado de la cita
-    - mascota_id: ID de la mascota
-    - veterinario_id: ID del veterinario
-    - fecha_desde: Desde fecha
-    - fecha_hasta: Hasta fecha
     """
     try:
-        service = AppointmentService(db)
+        # PROXY
+        appointment_service = ProxyFactory.create_appointment_service_with_cache_and_auth(
+            db=db,
+            current_user=current_user
+        )
 
-        # Convertir enum a AppointmentStatus si está presente
         status_filter = AppointmentStatus(estado.value) if estado else None
 
-        appointments = service.get_all_appointments(
+        appointments = appointment_service.get_all_appointments(
             skip=skip,
             limit=limit,
             estado=status_filter,
@@ -137,6 +118,11 @@ async def list_appointments(
             message="Lista de citas"
         )
 
+    except PermissionDeniedException as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(exc)
+        )
     except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -144,39 +130,40 @@ async def list_appointments(
         )
 
 
-@router.get("/{appointment_id}", response_model=dict)
-async def get_appointment(
-        appointment_id: UUID,
+@router.get("/date/{fecha}", response_model=dict)
+async def get_appointments_by_date(
+        fecha: date,
+        veterinario_id: Optional[UUID] = Query(None),
         db: Session = Depends(get_db),
         current_user: User = Depends(get_current_active_user)
 ):
-    """
-    Obtiene una cita por ID
-
-    **Requiere:** Token JWT válido
-    **Acceso:** Usuario autenticado (con validación de permisos)
-    """
     try:
-        service = AppointmentService(db)
-        appointment = service.get_appointment_by_id(appointment_id)
-
-        if not appointment:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Cita no encontrada"
-            )
-
-        return success_response(
-            data=appointment.to_dict(),
-            message="Cita encontrada"
+        appointment_service = ProxyFactory.create_appointment_service_with_cache_and_auth(
+            db=db,
+            current_user=current_user
         )
 
-    except HTTPException:
-        raise
+        appointments = appointment_service.get_appointments_by_date(
+            fecha, veterinario_id
+        )
+
+        return success_response(
+            data={
+                "total": len(appointments),
+                "citas": [apt.to_dict() for apt in appointments]
+            },
+            message="Citas obtenidas exitosamente"
+        )
+
+    except PermissionDeniedException as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(exc)
+        )
     except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error al obtener cita: {str(exc)}"
+            detail=f"Error al obtener citas: {str(exc)}"
         )
 
 
@@ -189,16 +176,6 @@ async def reschedule_appointment(
 ):
     """
     Reprograma una cita existente
-
-    **Requiere:** Token JWT válido
-    **Acceso:** Staff (Superadmin, Veterinario, Auxiliar)
-
-    **RN08-3:** Reprogramaciones solo hasta 2 horas antes
-
-    **Validaciones:**
-    - Anticipación mínima de 2 horas
-    - Nuevo horario debe estar disponible
-    - Solo citas AGENDADAS o CONFIRMADAS pueden reprogramarse
     """
     try:
         cmd = RescheduleAppointmentCommand(
@@ -233,14 +210,6 @@ async def confirm_appointment(
         db: Session = Depends(get_db),
         current_user: User = Depends(require_staff)
 ):
-    """
-    Confirma una cita
-
-    **Requiere:** Token JWT válido
-    **Acceso:** Staff (Superadmin, Veterinario, Auxiliar)
-
-    **Transición:** AGENDADA → CONFIRMADA
-    """
     try:
         cmd = ConfirmAppointmentCommand(
             db=db,
@@ -273,16 +242,6 @@ async def cancel_appointment(
         db: Session = Depends(get_db),
         current_user: User = Depends(require_staff)
 ):
-    """
-    Cancela una cita
-
-    **Requiere:** Token JWT válido
-    **Acceso:** Staff (Superadmin, Veterinario, Auxiliar)
-
-    **RN08-2:** Cancelaciones con menos de 4 horas se registran como tardías
-
-    **Transiciones permitidas:** AGENDADA/CONFIRMADA → CANCELADA
-    """
     try:
         cmd = CancelAppointmentCommand(
             db=db,
@@ -315,23 +274,28 @@ async def start_appointment(
         db: Session = Depends(get_db),
         current_user: User = Depends(require_staff)
 ):
-    """
-    Inicia una cita (cambiar a estado EN_PROCESO)
-
-    **Requiere:** Token JWT válido
-    **Acceso:** Staff (Superadmin, Veterinario, Auxiliar)
-
-    **Transición:** CONFIRMADA → EN_PROCESO
-    """
     try:
-        service = AppointmentService(db)
-        appointment = service.start_appointment(appointment_id, current_user.id)
+        # PROXY reemplaza AppointmentService
+        appointment_service = ProxyFactory.create_appointment_service_with_cache_and_auth(
+            db=db,
+            current_user=current_user
+        )
+
+        appointment = appointment_service.start_appointment(
+            appointment_id,
+            current_user.id
+        )
 
         return success_response(
             data=appointment.to_dict(),
             message="Cita iniciada exitosamente"
         )
 
+    except PermissionDeniedException as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(exc)
+        )
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -351,17 +315,13 @@ async def complete_appointment(
         db: Session = Depends(get_db),
         current_user: User = Depends(require_staff)
 ):
-    """
-    Completa una cita (cambiar a estado COMPLETADA)
-
-    **Requiere:** Token JWT válido
-    **Acceso:** Staff (Superadmin, Veterinario, Auxiliar)
-
-    **Transición:** EN_PROCESO → COMPLETADA
-    """
     try:
-        service = AppointmentService(db)
-        appointment = service.complete_appointment(
+        appointment_service = ProxyFactory.create_appointment_service_with_cache_and_auth(
+            db=db,
+            current_user=current_user
+        )
+
+        appointment = appointment_service.complete_appointment(
             appointment_id,
             notas,
             current_user.id
@@ -372,6 +332,11 @@ async def complete_appointment(
             message="Cita completada exitosamente"
         )
 
+    except PermissionDeniedException as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(exc)
+        )
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -393,20 +358,11 @@ async def get_veterinarian_availability(
         current_user: User = Depends(get_current_active_user)
 ):
     """
-    Obtiene la disponibilidad de un veterinario en una fecha específica
-
-    **Requiere:** Token JWT válido
-    **Acceso:** Cualquier usuario autenticado
-
-    **Parámetros:**
-    - veterinario_id: ID del veterinario
-    - fecha: Fecha a consultar
-    - duracion_minutos: Duración estimada de la cita (default: 30 min)
-
-    **Retorna:** Horarios disponibles en intervalos de 30 minutos
+    Obtiene la disponibilidad de un veterinario
     """
     try:
         facade = AppointmentFacade(db)
+
         result = facade.obtener_disponibilidad_veterinario(
             veterinario_id,
             fecha,

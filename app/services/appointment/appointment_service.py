@@ -7,7 +7,7 @@ Integra todos los patrones de diseño
 from sqlalchemy.orm import Session
 from typing import Optional, List
 from uuid import UUID
-from datetime import datetime
+from datetime import datetime, date
 
 from app.models.appointment import Appointment, AppointmentStatus
 from app.repositories.appointment_repository import AppointmentRepository
@@ -146,6 +146,36 @@ class AppointmentService:
             veterinario_id=veterinario_id,
             fecha_desde=fecha_desde,
             fecha_hasta=fecha_hasta
+        )
+
+    def get_appointments_by_date(
+            self,
+            fecha: date,
+            veterinario_id: Optional[UUID] = None
+    ) -> List[Appointment]:
+        """
+        Obtiene todas las citas de una fecha específica
+
+        Método agregado para compatibilidad con CacheProxy
+
+        Args:
+            fecha: Fecha a consultar
+            veterinario_id: Filtrar por veterinario específico (opcional)
+
+        Returns:
+            Lista de citas de la fecha
+        """
+        # Convertir fecha a rango datetime (inicio y fin del día)
+        from datetime import datetime, timezone, timedelta
+
+        fecha_inicio = datetime.combine(fecha, datetime.min.time()).replace(tzinfo=timezone.utc)
+        fecha_fin = fecha_inicio + timedelta(days=1)
+
+        # Usar método existente get_all_appointments con filtros de fecha
+        return self.get_all_appointments(
+            fecha_desde=fecha_inicio,
+            fecha_hasta=fecha_fin,
+            veterinario_id=veterinario_id
         )
 
     def reschedule_appointment(
