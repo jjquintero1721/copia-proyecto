@@ -330,7 +330,7 @@ class AuthProxy:
             return []
 
         pet_repo = PetRepository(db_session)
-        pets = pet_repo.get_by_propietario(self._current_user.id)
+        pets = pet_repo.get_by_owner_and_name(self._current_user.id)
 
         return [pet.id for pet in pets]
 

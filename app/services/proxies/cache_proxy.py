@@ -310,14 +310,12 @@ class CacheProxy:
                 fecha_hora=datetime.fromisoformat(item['fecha_hora']),
                 motivo=item['motivo'],
                 estado=AppointmentStatus(item['estado']),
-                observaciones=item.get('observaciones'),
-                motivo_cancelacion=item.get('motivo_cancelacion'),
                 creado_por=UUID(item['creado_por']) if item.get('creado_por') else None
             )
 
             # Establecer timestamps
-            appointment.created_at = datetime.fromisoformat(item['created_at'])
-            appointment.updated_at = datetime.fromisoformat(item['updated_at'])
+            appointment.fecha_creacion = datetime.fromisoformat(item['fecha_creacion'])
+            appointment.fecha_actualizacion = datetime.fromisoformat(item['fecha_actualizacion'])
 
             appointments.append(appointment)
 
@@ -334,9 +332,7 @@ class CacheProxy:
             'fecha_hora': appointment.fecha_hora.isoformat(),
             'motivo': appointment.motivo,
             'estado': appointment.estado.value,
-            'observaciones': appointment.observaciones,
-            'motivo_cancelacion': appointment.motivo_cancelacion,
             'creado_por': str(appointment.creado_por) if appointment.creado_por else None,
-            'created_at': appointment.created_at.isoformat(),
-            'updated_at': appointment.updated_at.isoformat()
+            'fecha_creacion': appointment.fecha_creacion.isoformat(),
+            'fecha_actualizacion': appointment.fecha_actualizacion.isoformat()
         }
