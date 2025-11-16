@@ -26,7 +26,7 @@ from .proxy_factory import ProxyFactory
 from .redis_config import get_redis_client, is_redis_available
 from .user_auth_proxy import UserAuthProxy
 
-__all__ = [
+_all_ = [
     'AppointmentServiceInterface',
     'CacheProxy',
     'AuthProxy',

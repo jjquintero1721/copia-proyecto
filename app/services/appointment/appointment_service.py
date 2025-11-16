@@ -28,7 +28,7 @@ class AppointmentService:
     """
     CITA_NOT_FOUND_MSG = "Cita no encontrado"
 
-    def __init__(self, db: Session):
+    def _init_(self, db: Session):
         self.db = db
         self.repository = AppointmentRepository(db)
         self.service_repo = ServiceRepository(db)
