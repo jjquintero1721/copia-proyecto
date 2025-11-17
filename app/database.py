@@ -128,6 +128,10 @@ def get_db():
     db = db_connection.get_session()
     try:
         yield db
+        db.commit()  # ← importante: confirmar transacciones abiertas
+    except Exception:
+        db.rollback()  # ← evita que la sesión quede corrupta
+        raise
     finally:
         db.close()
 

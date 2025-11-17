@@ -32,9 +32,6 @@ try:
 except ImportError:
     APSCHEDULER_AVAILABLE = False
     logger.warning(
-        "⚠️ APScheduler no está instalado. "
-        "Los recordatorios automáticos no funcionarán. "
-        "Instala con: pip install apscheduler"
     )
 
 
@@ -63,8 +60,6 @@ class SchedulerService:
         """Inicializa el scheduler si no está inicializado"""
         if not APSCHEDULER_AVAILABLE:
             logger.error(
-                "❌ APScheduler no disponible. "
-                "Instala con: pip install apscheduler"
             )
             return
 

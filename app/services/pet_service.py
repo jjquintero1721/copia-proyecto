@@ -17,7 +17,7 @@ from app.repositories.pet_repository import PetRepository
 from app.models.pet import Pet
 from app.models.medical_history import MedicalHistory
 from app.utils.medical_history_number_generator import MedicalHistoryNumberGenerator
-
+from app.models.owner import Owner
 
 class CreatePetService(CreateTemplate):
     """
@@ -64,6 +64,11 @@ class CreatePetService(CreateTemplate):
         o si el microchip está duplicado.
         Lanza ValueError si se encuentra un duplicado.
         """
+        owner = self.db.query(Owner).filter(Owner.id == self.propietario_id).first()
+        if not owner:
+            raise ValueError("El propietario no existe en el sistema")
+
+        # 2. Validar duplicado
         if self.repo.exists_duplicate(self.propietario_id, self.nombre, self.microchip):
             raise ValueError("Ya existe una mascota con el mismo nombre para el propietario o microchip duplicado")
 

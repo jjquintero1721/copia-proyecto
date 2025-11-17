@@ -44,8 +44,8 @@ class PetRepository:
             return (
                 self.db.query(Pet.id)
                 .filter(
-                    (Pet.propietario_id == owner_id) & (Pet.nombre.ilike(nombre))
-                    | (Pet.microchip == microchip)
+                    ((Pet.propietario_id == owner_id) & Pet.nombre.ilike(nombre)) |
+                    (Pet.microchip == microchip)
                 )
                 .first()
                 is not None
