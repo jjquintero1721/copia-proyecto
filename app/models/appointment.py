@@ -49,7 +49,7 @@ class Appointment(Base):
     consultas = relationship("Consultation", back_populates="cita")
 
     # Fecha y hora de la cita
-    fecha_hora = Column(DateTime, nullable=False, index=True)
+    fecha_hora = Column(DateTime(timezone=True), nullable=False, index=True)
 
     # Estado de la cita (State Pattern)
     estado = Column(SQLEnum(AppointmentStatus), nullable=False,

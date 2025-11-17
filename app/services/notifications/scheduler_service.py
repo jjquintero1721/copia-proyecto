@@ -166,8 +166,10 @@ class SchedulerService:
             return None
 
         # Calcular cuándo enviar el recordatorio
-        reminder_time = appointment_datetime - timedelta(hours=notification_hours_before)
+        if appointment_datetime.tzinfo is None:
+            appointment_datetime = appointment_datetime.replace(tzinfo=timezone.utc)
 
+        reminder_time = appointment_datetime - timedelta(hours=notification_hours_before)
         # No programar si el recordatorio ya pasó
         now = datetime.now(timezone.utc)
         if reminder_time <= now:

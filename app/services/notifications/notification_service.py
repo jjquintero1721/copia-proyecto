@@ -434,6 +434,10 @@ class NotificationService:
         try:
             from app.services.notifications.scheduler_service import get_scheduler_service
 
+            fecha_hora = appointment.fecha_hora
+            if fecha_hora.tzinfo is None:
+                fecha_hora = fecha_hora.replace(tzinfo=timezone.utc)
+
             scheduler = get_scheduler_service()
             scheduler.schedule_appointment_reminder(
                 appointment.id,

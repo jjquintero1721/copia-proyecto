@@ -78,8 +78,10 @@ class AppointmentService:
         self.gestor_citas.notificar(
             "CITA_CREADA",
             appointment,
-            usuario_id=creado_por,
-            accion="Creación de cita"
+            {
+                "usuario_id": creado_por,
+                "accion": "Creación de cita"
+            }
         )
 
         return appointment
@@ -159,9 +161,12 @@ class AppointmentService:
             self.gestor_citas.notificar(
                 "CITA_REPROGRAMADA",
                 appointment,
-                usuario_id=usuario_id,
-                fecha_anterior=fecha_anterior.isoformat(),
-                fecha_nueva=nueva_fecha.isoformat()
+                {
+                    "usuario_id": usuario_id,
+                    "fecha_anterior": fecha_anterior.isoformat(),
+                    "fecha_nueva": nueva_fecha.isoformat(),
+                    "accion": "Reprogramación de cita"
+                }
             )
 
             return appointment
@@ -186,7 +191,10 @@ class AppointmentService:
             self.gestor_citas.notificar(
                 "CITA_CONFIRMADA",
                 appointment,
-                usuario_id=usuario_id
+                {
+                    "usuario_id": usuario_id,
+                    "accion": "Confirmación de cita"
+                }
             )
 
             return appointment
@@ -211,8 +219,11 @@ class AppointmentService:
             self.gestor_citas.notificar(
                 "CITA_CANCELADA",
                 appointment,
-                usuario_id=usuario_id,
-                cancelacion_tardia=appointment.cancelacion_tardia
+                {
+                    "usuario_id": usuario_id,
+                    "cancelacion_tardia": appointment.cancelacion_tardia,
+                    "accion": "Cancelación de cita"
+                }
             )
 
             return appointment
@@ -237,7 +248,10 @@ class AppointmentService:
             self.gestor_citas.notificar(
                 "CITA_INICIADA",
                 appointment,
-                usuario_id=usuario_id
+                {
+                    "usuario_id": usuario_id,
+                    "accion": "Inicio de cita"
+                }
             )
 
             return appointment
@@ -266,7 +280,10 @@ class AppointmentService:
             self.gestor_citas.notificar(
                 "CITA_COMPLETADA",
                 appointment,
-                usuario_id=usuario_id
+                {
+                    "usuario_id": usuario_id,
+                    "accion": "Finalización de cita"
+                }
             )
 
             return appointment
