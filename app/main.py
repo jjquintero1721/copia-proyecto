@@ -11,9 +11,10 @@ from dotenv import load_dotenv
 from sqlalchemy import text
 import app.models  # asegura registro de modelos
 import logging
+from app.services.notifications import initialize_scheduler, shutdown_scheduler
 
 # Cargar variables de entorno
-load_dotenv(encoding="latin-1")
+load_dotenv()
 
 logging.basicConfig(
     level=logging.INFO,
@@ -56,6 +57,7 @@ medical_history_controller,
 appointment_controller,
 inventory_controller,
 follow_up_controller,
+notification_settings_controller
 )
 
 # Registrar rutas
@@ -113,6 +115,12 @@ app.include_router(
     follow_up_controller.router,
     prefix="/api/v1/follow-up",
     tags=["Seguimiento de Pacientes"]
+)
+
+app.include_router(
+    notification_settings_controller.router,
+    prefix=f"/api/v1/notifications",
+    tags=["Notificaciones"]
 )
 
 # Endpoint raíz
@@ -173,6 +181,13 @@ async def startup_event():
     init_db()
     print("✅ Tablas de base de datos inicializadas")
 
+    try:
+        initialize_scheduler()
+        print("✅ Sistema de recordatorios automáticos iniciado")
+    except Exception as e:
+        print(f"⚠️ No se pudo iniciar el scheduler: {e}")
+        print("   El sistema funcionará sin recordatorios automáticos")
+
 
 @app.on_event("shutdown")
 async def shutdown_event():
@@ -180,6 +195,13 @@ async def shutdown_event():
     Acciones a ejecutar al detener la aplicación
     """
     print("🛑 Deteniendo Sistema GDCV...")
+
+    try:
+        shutdown_scheduler()
+        print("✅ Scheduler detenido correctamente")
+    except Exception as e:
+        print(f"⚠️ Error al detener scheduler: {e}")
+
     # Cerrar conexiones de base de datos
     from app.database import db_connection
     db_connection.close_connection()

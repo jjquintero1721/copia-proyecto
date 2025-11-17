@@ -1,13 +1,16 @@
 """
-Observer Pattern - Sistema de notificaciones y auditoría para citas
+Observer Pattern - Sistema de notificaciones actualizado
 RF-06: Notificaciones por correo
 RNF-07: Auditoría de acciones
+
+ACTUALIZADO: Integra con NotificationService, EmailAdapter y plantillas HTML
 """
 
 from abc import ABC, abstractmethod
-from typing import List, Dict, Any
+from typing import Dict, Any
 from datetime import datetime, timezone
 from uuid import UUID
+from sqlalchemy.orm import Session
 
 from app.models.appointment import Appointment
 
@@ -15,6 +18,7 @@ from app.models.appointment import Appointment
 class AppointmentObserver(ABC):
     """
     Observador abstracto para eventos de citas
+    Patrón Observer: Define la interfaz para observadores
     """
 
     @abstractmethod
@@ -34,31 +38,94 @@ class NotificadorCorreo(AppointmentObserver):
     """
     Observer que envía notificaciones por correo
     RF-06: Notificaciones automáticas
+
+    ACTUALIZADO: Usa NotificationService con EmailAdapter y plantillas HTML
     """
 
+    def __init__(self, db: Session):
+        """
+        Inicializa el observador con sesión de base de datos
+
+        Args:
+            db: Sesión de SQLAlchemy
+        """
+        self.db = db
+
     def actualizar(self, evento: str, cita: Appointment, datos: Dict[str, Any]) -> None:
-        """Envía notificaciones por correo según el evento"""
-        print(f"📧 [NotificadorCorreo] Enviando correo para evento: {evento}")
+        """
+        Envía notificaciones por correo según el evento
 
-        # Aquí se integraría con el servicio de correo (EmailService/Adapter)
-        # Por ahora solo registramos en consola
+        Integración con NotificationService:
+        - CITA_CREADA → send_appointment_confirmation
+        - CITA_REPROGRAMADA → send_appointment_reschedule_notification
+        - CITA_CANCELADA → send_appointment_cancellation_notification
+        - RECORDATORIO_CITA → send_appointment_reminder (programado)
+        """
+        import logging
+        logger = logging.getLogger(__name__)
 
-        if evento == "CITA_CREADA":
-            print(f"   → Confirmación de cita para {cita.mascota_id}")
-            print(f"   → Fecha: {cita.fecha_hora}")
+        logger.info(f"📧 [NotificadorCorreo] Procesando evento: {evento}")
 
-        elif evento == "CITA_REPROGRAMADA":
-            print("   → Notificación de reprogramación")
-            print(f"   → Nueva fecha: {cita.fecha_hora}")
+        # Importar NotificationService
+        from app.services.notifications.notification_service import NotificationService
 
-        elif evento == "CITA_CANCELADA":
-            if cita.cancelacion_tardia:
-                print("   → Notificación de cancelación tardía")
-            else:
-                print("   → Notificación de cancelación")
+        try:
+            notification_service = NotificationService(self.db)
+            user_id = datos.get('usuario_id')
 
-        elif evento == "RECORDATORIO_CITA":
-            print("   → Recordatorio de cita para mañana")
+            if evento == "CITA_CREADA":
+                # Enviar confirmación de cita
+                logger.info(f"   → Enviando confirmación de cita {cita.id}")
+                success = notification_service.send_appointment_confirmation(
+                    appointment_id=cita.id,
+                    user_id=user_id
+                )
+
+                if success:
+                    logger.info("   ✅ Confirmación enviada exitosamente")
+                else:
+                    logger.warning("   ⚠️ No se pudo enviar confirmación")
+
+            elif evento == "CITA_REPROGRAMADA":
+                # Enviar notificación de reprogramación
+                logger.info(f"   → Enviando notificación de reprogramación")
+                fecha_anterior = datos.get('fecha_anterior')
+
+                success = notification_service.send_appointment_reschedule_notification(
+                    appointment_id=cita.id,
+                    fecha_anterior=fecha_anterior,
+                    user_id=user_id
+                )
+
+                if success:
+                    logger.info("   ✅ Notificación de reprogramación enviada")
+                else:
+                    logger.warning("   ⚠️ No se pudo enviar notificación")
+
+            elif evento == "CITA_CANCELADA":
+                # Enviar notificación de cancelación
+                logger.info(f"   → Enviando notificación de cancelación")
+
+                success = notification_service.send_appointment_cancellation_notification(
+                    appointment_id=cita.id,
+                    cancelacion_tardia=cita.cancelacion_tardia,
+                    user_id=user_id
+                )
+
+                if success:
+                    logger.info("   ✅ Notificación de cancelación enviada")
+                else:
+                    logger.warning("   ⚠️ No se pudo enviar notificación")
+
+            elif evento == "RECORDATORIO_CITA":
+                # Los recordatorios son programados automáticamente
+                # por SchedulerService cuando se crea la cita
+                logger.info("   ℹ️ Recordatorio programado por SchedulerService")
+
+        except Exception as error:
+            logger.error(
+                f"   ❌ Error al procesar notificación: {str(error)}"
+            )
 
 
 class RegistroAuditoria(AppointmentObserver):
@@ -69,20 +136,23 @@ class RegistroAuditoria(AppointmentObserver):
 
     def actualizar(self, evento: str, cita: Appointment, datos: Dict[str, Any]) -> None:
         """Registra la acción en el sistema de auditoría"""
-        print(f"📋 [Auditoría] Registrando evento: {evento}")
-        print(f"   → Cita ID: {cita.id}")
-        print(f"   → Fecha/Hora: {datetime.now(timezone.utc)}")
-        print(f"   → Usuario: {datos.get('usuario_id', 'Sistema')}")
-        print(f"   → Detalles: {datos}")
+        import logging
+        logger = logging.getLogger(__name__)
 
-        # Aquí se guardaría en una tabla de auditoría
+        logger.info(f"📋 [Auditoría] Registrando evento: {evento}")
+        logger.info(f"   → Cita ID: {cita.id}")
+        logger.info(f"   → Fecha/Hora: {datetime.now(timezone.utc)}")
+        logger.info(f"   → Usuario: {datos.get('usuario_id', 'Sistema')}")
+        logger.info(f"   → Detalles: {datos}")
+
+        # TODO: Implementar guardado en tabla de auditoría
         # audit_record = AuditLog(
         #     entidad="Cita",
         #     entidad_id=cita.id,
         #     accion=evento,
         #     usuario_id=datos.get('usuario_id'),
         #     detalles=json.dumps(datos),
-        #     fecha=datetime.utcnow()
+        #     fecha=datetime.now(timezone.utc)
         # )
 
 
@@ -94,59 +164,88 @@ class MetricasObserver(AppointmentObserver):
 
     def actualizar(self, evento: str, cita: Appointment, datos: Dict[str, Any]) -> None:
         """Registra métricas de uso"""
-        print(f"📊 [Métricas] Evento: {evento}")
+        import logging
+        logger = logging.getLogger(__name__)
 
-        # Aquí se enviarían métricas a un sistema de monitoreo
+        logger.info(f"📊 [Métricas] Evento: {evento}")
+
+        # TODO: Enviar métricas a sistema de monitoreo
         # (ej: Prometheus, CloudWatch, etc.)
 
+
+# ==================== GESTOR DE OBSERVADORES ====================
 
 class GestorCitas:
     """
     Subject del patrón Observer
-    Gestiona la lista de observadores y notifica eventos
+    Gestiona la lista de observadores y notifica cambios
     """
 
-    def __init__(self):
-        self._observadores: List[AppointmentObserver] = []
+    def __init__(self, db: Session):
+        self.observadores: list[AppointmentObserver] = []
+        self.db = db
 
     def agregar_observador(self, observador: AppointmentObserver) -> None:
         """Agrega un observador a la lista"""
-        if observador not in self._observadores:
-            self._observadores.append(observador)
+        if observador not in self.observadores:
+            self.observadores.append(observador)
 
-    def eliminar_observador(self, observador: AppointmentObserver) -> None:
-        """Elimina un observador de la lista"""
-        if observador in self._observadores:
-            self._observadores.remove(observador)
+    def remover_observador(self, observador: AppointmentObserver) -> None:
+        """Remueve un observador de la lista"""
+        if observador in self.observadores:
+            self.observadores.remove(observador)
 
-    def notificar(self, evento: str, cita: Appointment, **datos) -> None:
+    def notificar(self, evento: str, cita: Appointment, datos: Dict[str, Any]) -> None:
         """
         Notifica a todos los observadores sobre un evento
 
         Args:
-            evento: Tipo de evento (CITA_CREADA, etc.)
+            evento: Tipo de evento
             cita: Cita afectada
-            **datos: Datos adicionales del evento
+            datos: Datos adicionales
         """
-        for observador in self._observadores:
-            observador.actualizar(evento, cita, datos)
+        import logging
+        logger = logging.getLogger(__name__)
+
+        logger.info(f"🔔 Notificando evento: {evento} para cita {cita.id}")
+
+        for observador in self.observadores:
+            try:
+                observador.actualizar(evento, cita, datos)
+            except Exception as error:
+                logger.error(
+                    f"❌ Error en observador {observador.__class__.__name__}: "
+                    f"{str(error)}"
+                )
 
 
-# Instancia global del gestor (Singleton pattern)
-_gestor_citas_instance = None
+# ==================== SINGLETON DEL GESTOR ====================
+
+_gestor_instance: dict[str, GestorCitas] = {}
 
 
-def get_gestor_citas() -> GestorCitas:
+def get_gestor_citas(db: Session) -> GestorCitas:
     """
-    Obtiene la instancia única del GestorCitas (Singleton)
+    Obtiene o crea una instancia del GestorCitas con los observadores configurados
+
+    Args:
+        db: Sesión de base de datos
+
+    Returns:
+        GestorCitas configurado con observadores
     """
-    global _gestor_citas_instance
-    if _gestor_citas_instance is None:
-        _gestor_citas_instance = GestorCitas()
+    # Usar hash de la sesión como key para tener un gestor por sesión
+    session_key = str(id(db))
 
-        # Registrar observadores por defecto
-        _gestor_citas_instance.agregar_observador(NotificadorCorreo())
-        _gestor_citas_instance.agregar_observador(RegistroAuditoria())
-        _gestor_citas_instance.agregar_observador(MetricasObserver())
+    if session_key not in _gestor_instance:
+        # Crear nuevo gestor
+        gestor = GestorCitas(db)
 
-    return _gestor_citas_instance
+        # Agregar observadores
+        gestor.agregar_observador(NotificadorCorreo(db))
+        gestor.agregar_observador(RegistroAuditoria())
+        gestor.agregar_observador(MetricasObserver())
+
+        _gestor_instance[session_key] = gestor
+
+    return _gestor_instance[session_key]

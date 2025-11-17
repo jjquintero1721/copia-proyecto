@@ -16,3 +16,20 @@ from app.schemas.follow_up_schema import (
     FollowUpListResponse,
     FollowUpCompletionCreate
 )
+from app.schemas.notification_settings_schema import (
+    NotificationSettingsCreate,
+    NotificationSettingsUpdate,
+    NotificationSettingsResponse,
+    EmailProviderInfoResponse,
+    EmailTestRequest,
+    EmailTestResponse
+)
+
+__all__ = [
+    'NotificationSettingsCreate',
+    'NotificationSettingsUpdate',
+    'NotificationSettingsResponse',
+    'EmailProviderInfoResponse',
+    'EmailTestRequest',
+    'EmailTestResponse'
+]

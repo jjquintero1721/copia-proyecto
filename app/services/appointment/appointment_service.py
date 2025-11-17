@@ -28,7 +28,7 @@ class AppointmentService:
     """
     CITA_NOT_FOUND_MSG = "Cita no encontrado"
 
-    def _init_(self, db: Session):
+    def __init__(self, db: Session):
         self.db = db
         self.repository = AppointmentRepository(db)
         self.service_repo = ServiceRepository(db)
@@ -39,54 +39,30 @@ class AppointmentService:
         self.state_manager = AppointmentStateManager
 
         # Gestor de observadores (Observer Pattern)
-        self.gestor_citas = get_gestor_citas()
+        # ← CAMBIO IMPORTANTE
+        self.gestor_citas = get_gestor_citas(self.db)
 
     def create_appointment(
             self,
             appointment_data: AppointmentCreate,
             creado_por: Optional[UUID] = None
     ) -> Appointment:
-        """
-        Crea una nueva cita
 
-        Template Method:
-        1. Validar datos
-        2. Validar anticipación (Strategy)
-        3. Validar disponibilidad
-        4. Crear cita
-        5. Notificar (Observer)
-
-        Args:
-            appointment_data: Datos de la cita
-            creado_por: ID del usuario que crea la cita
-
-        Returns:
-            Appointment creada
-
-        Raises:
-            ValueError: Si hay errores de validación
-        """
-        # 1. Validar que existan las entidades relacionadas
         self._validar_entidades(appointment_data)
 
-        # 2. Validar anticipación usando Strategy Pattern
         gestor = GestorAgendamiento(PoliticaEstandar())
         es_valida, mensaje_error = gestor.validar(appointment_data.fecha_hora)
         if not es_valida:
             raise ValueError(mensaje_error)
 
-        # 3. Validar disponibilidad del veterinario
         servicio = self.service_repo.get_by_id(appointment_data.servicio_id)
         if not self.repository.check_availability(
                 veterinario_id=appointment_data.veterinario_id,
                 fecha_hora=appointment_data.fecha_hora,
                 duracion_minutos=servicio.duracion_minutos
         ):
-            raise ValueError(
-                "El horario no está disponible. Por favor seleccione otro horario."
-            )
+            raise ValueError("El horario no está disponible.")
 
-        # 4. Crear la cita
         appointment = Appointment(
             mascota_id=appointment_data.mascota_id,
             veterinario_id=appointment_data.veterinario_id,
@@ -99,7 +75,6 @@ class AppointmentService:
 
         appointment = self.repository.create(appointment)
 
-        # 5. Notificar a observadores (Observer Pattern)
         self.gestor_citas.notificar(
             "CITA_CREADA",
             appointment,
@@ -110,7 +85,6 @@ class AppointmentService:
         return appointment
 
     def get_appointment_by_id(self, appointment_id: UUID) -> Optional[Appointment]:
-        """Obtiene una cita por ID"""
         return self.repository.get_by_id(appointment_id)
 
     def get_all_appointments(
@@ -123,21 +97,7 @@ class AppointmentService:
             fecha_desde: Optional[datetime] = None,
             fecha_hasta: Optional[datetime] = None
     ) -> List[Appointment]:
-        """
-        Obtiene todas las citas con filtros opcionales
 
-        Args:
-            skip: Registros a omitir (paginación)
-            limit: Límite de registros
-            estado: Filtrar por estado
-            mascota_id: Filtrar por mascota
-            veterinario_id: Filtrar por veterinario
-            fecha_desde: Filtrar desde fecha
-            fecha_hasta: Filtrar hasta fecha
-
-        Returns:
-            Lista de citas
-        """
         return self.repository.get_all(
             skip=skip,
             limit=limit,
@@ -153,25 +113,12 @@ class AppointmentService:
             fecha: date,
             veterinario_id: Optional[UUID] = None
     ) -> List[Appointment]:
-        """
-        Obtiene todas las citas de una fecha específica
 
-        Método agregado para compatibilidad con CacheProxy
-
-        Args:
-            fecha: Fecha a consultar
-            veterinario_id: Filtrar por veterinario específico (opcional)
-
-        Returns:
-            Lista de citas de la fecha
-        """
-        # Convertir fecha a rango datetime (inicio y fin del día)
         from datetime import datetime, timezone, timedelta
 
         fecha_inicio = datetime.combine(fecha, datetime.min.time()).replace(tzinfo=timezone.utc)
         fecha_fin = fecha_inicio + timedelta(days=1)
 
-        # Usar método existente get_all_appointments con filtros de fecha
         return self.get_all_appointments(
             fecha_desde=fecha_inicio,
             fecha_hasta=fecha_fin,
@@ -184,34 +131,16 @@ class AppointmentService:
             nueva_fecha: datetime,
             usuario_id: Optional[UUID] = None
     ) -> Appointment:
-        """
-        Reprograma una cita existente
 
-        RN08-3: Reprogramaciones solo se permiten hasta 2 horas antes
-
-        Args:
-            appointment_id: ID de la cita
-            nueva_fecha: Nueva fecha y hora
-            usuario_id: ID del usuario que reprograma
-
-        Returns:
-            Appointment reprogramada
-
-        Raises:
-            ValueError: Si no se puede reprogramar
-        """
-        # Obtener cita
         appointment = self.repository.get_by_id(appointment_id)
         if not appointment:
             raise ValueError(self.CITA_NOT_FOUND_MSG)
 
-        # Validar anticipación con Strategy Pattern
         gestor = GestorAgendamiento(PoliticaReprogramacion())
         es_valida, mensaje_error = gestor.validar(nueva_fecha)
         if not es_valida:
             raise ValueError(mensaje_error)
 
-        # Validar disponibilidad del veterinario
         servicio = self.service_repo.get_by_id(appointment.servicio_id)
         if not self.repository.check_availability(
                 veterinario_id=appointment.veterinario_id,
@@ -221,15 +150,12 @@ class AppointmentService:
         ):
             raise ValueError("El nuevo horario no está disponible")
 
-        # Guardar fecha anterior para auditoría
         fecha_anterior = appointment.fecha_hora
 
-        # Reprogramar usando State Pattern
         try:
             self.state_manager.reprogramar(appointment, nueva_fecha)
             appointment = self.repository.update(appointment)
 
-            # Notificar a observadores
             self.gestor_citas.notificar(
                 "CITA_REPROGRAMADA",
                 appointment,
@@ -248,29 +174,15 @@ class AppointmentService:
             appointment_id: UUID,
             usuario_id: Optional[UUID] = None
     ) -> Appointment:
-        """
-        Confirma una cita
 
-        Args:
-            appointment_id: ID de la cita
-            usuario_id: ID del usuario que confirma
-
-        Returns:
-            Appointment confirmada
-
-        Raises:
-            ValueError: Si no se puede confirmar
-        """
         appointment = self.repository.get_by_id(appointment_id)
         if not appointment:
             raise ValueError(self.CITA_NOT_FOUND_MSG)
 
         try:
-            # Confirmar usando State Pattern
             self.state_manager.confirmar(appointment)
             appointment = self.repository.update(appointment)
 
-            # Notificar a observadores
             self.gestor_citas.notificar(
                 "CITA_CONFIRMADA",
                 appointment,
@@ -287,31 +199,15 @@ class AppointmentService:
             appointment_id: UUID,
             usuario_id: Optional[UUID] = None
     ) -> Appointment:
-        """
-        Cancela una cita
 
-        RN08-2: Cancelaciones con menos de 4 horas se registran como tardías
-
-        Args:
-            appointment_id: ID de la cita
-            usuario_id: ID del usuario que cancela
-
-        Returns:
-            Appointment cancelada
-
-        Raises:
-            ValueError: Si no se puede cancelar
-        """
         appointment = self.repository.get_by_id(appointment_id)
         if not appointment:
             raise ValueError(self.CITA_NOT_FOUND_MSG)
 
         try:
-            # Cancelar usando State Pattern (detecta cancelación tardía)
             self.state_manager.cancelar(appointment)
             appointment = self.repository.update(appointment)
 
-            # Notificar a observadores
             self.gestor_citas.notificar(
                 "CITA_CANCELADA",
                 appointment,
@@ -329,19 +225,7 @@ class AppointmentService:
             appointment_id: UUID,
             usuario_id: Optional[UUID] = None
     ) -> Appointment:
-        """
-        Inicia una cita (cambiar a estado EN_PROCESO)
 
-        Args:
-            appointment_id: ID de la cita
-            usuario_id: ID del usuario que inicia
-
-        Returns:
-            Appointment en proceso
-
-        Raises:
-            ValueError: Si no se puede iniciar
-        """
         appointment = self.repository.get_by_id(appointment_id)
         if not appointment:
             raise ValueError("Cita no encontrada")
@@ -367,20 +251,7 @@ class AppointmentService:
             notas: Optional[str] = None,
             usuario_id: Optional[UUID] = None
     ) -> Appointment:
-        """
-        Completa una cita (cambiar a estado COMPLETADA)
 
-        Args:
-            appointment_id: ID de la cita
-            notas: Notas finales de la cita
-            usuario_id: ID del usuario que completa
-
-        Returns:
-            Appointment completada
-
-        Raises:
-            ValueError: Si no se puede completar
-        """
         appointment = self.repository.get_by_id(appointment_id)
         if not appointment:
             raise ValueError("Cita no encontrada")
@@ -404,24 +275,15 @@ class AppointmentService:
             raise ValueError(f"No se puede completar: {str(e)}")
 
     def _validar_entidades(self, appointment_data: AppointmentCreate) -> None:
-        """
-        Valida que existan las entidades relacionadas
-
-        Raises:
-            ValueError: Si alguna entidad no existe
-        """
-        # Validar mascota
         if not self.pet_repo.get_by_id(appointment_data.mascota_id):
             raise ValueError("La mascota no existe")
 
-        # Validar veterinario
         veterinario = self.user_repo.get_by_id(appointment_data.veterinario_id)
         if not veterinario:
             raise ValueError("El veterinario no existe")
         if veterinario.rol.value not in ["veterinario", "superadmin"]:
-            raise ValueError("El usuario seleccionado no es un veterinario")
+            raise ValueError("El usuario no es un veterinario válido")
 
-        # Validar servicio
         servicio = self.service_repo.get_by_id(appointment_data.servicio_id)
         if not servicio:
             raise ValueError("El servicio no existe")
