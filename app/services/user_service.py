@@ -1,18 +1,21 @@
 """
 Servicio de Usuarios - Lógica de negocio
 Implementa patrones: Factory Method, Builder, Template Method
+CORRECCIÓN ARQUITECTURAL: Crea Owner automáticamente para rol=propietario
 """
 
 from sqlalchemy.orm import Session
 from typing import Optional, List, Dict, Any
 from uuid import UUID
-from datetime import datetime , timezone
+from datetime import datetime, timezone
 from abc import ABC, abstractmethod
 
 from app.models.user import User, UserRole
+from app.models.owner import Owner
 from app.repositories.user_repository import UserRepository
+from app.repositories.owner_repository import OwnerRepository
 from app.security.auth import get_password_hash, verify_password, create_access_token
-from app.schemas.user_schema import UserCreate, UserUpdate, UserChangePassword
+from app.schemas.user_schema import UserCreate, UserUpdate, UserChangePassword, UserRoleEnum
 
 
 # ==================== PATRÓN BUILDER ====================
@@ -67,7 +70,6 @@ class UserFactory(ABC):
     @abstractmethod
     def create_user(self, data: UserCreate, creado_por: Optional[UUID] = None) -> User:
         """Método factory para crear usuarios"""
-        pass
 
     def _build_base_user(self, data: UserCreate, creado_por: Optional[UUID]) -> User:
         """Método auxiliar para construir usuario base usando Builder"""
@@ -148,12 +150,10 @@ class BaseCRUDService(ABC):
     @abstractmethod
     def _validar_datos(self, datos: Any) -> None:
         """Hook: Validación específica de cada servicio"""
-        pass
 
     @abstractmethod
     def _preparar_entidad(self, datos: Any) -> Any:
         """Hook: Preparación de la entidad"""
-        pass
 
     def _persistir(self, entidad: Any) -> Any:
         """Paso común: Persistir en BD"""
@@ -161,7 +161,6 @@ class BaseCRUDService(ABC):
 
     def _post_guardado(self, entidad: Any) -> None:
         """Hook: Acciones después de guardar"""
-        pass
 
 
 # ==================== SERVICIO PRINCIPAL ====================
@@ -169,6 +168,10 @@ class UserService(BaseCRUDService):
     """
     Servicio principal de usuarios
     Implementa Template Method y coordina las factories
+
+    CORRECCIÓN ARQUITECTURAL:
+    - Crea automáticamente Owner cuando rol = PROPIETARIO
+    - Mantiene sincronización entre usuarios y propietarios
     """
 
     USER_NOT_FOUND_MSG = "Usuario no encontrado"
@@ -177,6 +180,9 @@ class UserService(BaseCRUDService):
         self.db = db
         repository = UserRepository(db)
         super().__init__(repository)
+
+        # ✅ Repositorio adicional para Owner
+        self.owner_repository = OwnerRepository(db)
 
         # Registro de factories por rol
         self._factories: Dict[str, UserFactory] = {
@@ -201,15 +207,73 @@ class UserService(BaseCRUDService):
         return factory.create_user(datos, creado_por)
 
     def _post_guardado(self, entidad: User) -> None:
-        """Post-proceso después de guardar usuario"""
-        # Aquí se pueden agregar: notificaciones, auditoría, etc.
-        pass
+        """
+        Post-proceso después de guardar usuario
+
+        Si el usuario es PROPIETARIO, crear automáticamente
+        el registro en la tabla propietarios
+        """
+        # Si es propietario, crear Owner automáticamente
+        if entidad.rol == UserRole.PROPIETARIO:
+            # Usar el documento guardado temporalmente
+            documento = getattr(entidad, '_documento_temp', None)
+            self._crear_propietario_asociado(entidad, documento)
+
+    def _crear_propietario_asociado(self, user: User, documento: Optional[str] = None) -> Owner:
+        """
+        ✅ MÉTODO NUEVO: Crea Owner asociado al usuario
+
+        Soluciona el problema arquitectural:
+        - Antes: usuarios y propietarios estaban desincronizados
+        - Ahora: cada usuario propietario tiene su Owner automáticamente
+
+        Args:
+            user: Usuario recién creado con rol PROPIETARIO
+            documento: Documento de identidad (requerido)
+
+        Returns:
+            Owner creado
+
+        Raises:
+            ValueError: Si no se proporciona documento
+        """
+        if not documento:
+            raise ValueError("El documento es requerido para usuarios con rol propietario")
+
+        owner = Owner(
+            usuario_id=user.id,
+            nombre=user.nombre,
+            correo=user.correo,
+            documento=documento,
+            telefono=user.telefono,
+            activo=user.activo
+        )
+
+        self.db.add(owner)
+        self.db.commit()
+        self.db.refresh(owner)
+
+        return owner
 
     def create_user(self, user_data: UserCreate, creado_por: Optional[UUID] = None) -> User:
-        """Crea un nuevo usuario usando el Template Method"""
+        """
+        Crea un nuevo usuario usando el Template Method
+
+        """
+        # Validar documento para propietarios
+        if user_data.rol == UserRoleEnum.PROPIETARIO and not user_data.documento:
+            raise ValueError("El documento es requerido para registrar un propietario")
+
         self._validar_datos(user_data)
         user = self._preparar_entidad(user_data, creado_por)
-        return self._persistir(user)
+        user = self._persistir(user)
+
+        # Guardar documento temporalmente para _post_guardado
+        if user_data.documento:
+            user._documento_temp = user_data.documento
+
+        self._post_guardado(user)  # Aquí se crea Owner si aplica
+        return user
 
     def authenticate(self, correo: str, contrasena: str) -> Optional[tuple[User, str]]:
         """
@@ -249,6 +313,10 @@ class UserService(BaseCRUDService):
         """Obtiene todos los usuarios con paginación"""
         return self.repository.get_all(skip, limit, activo)
 
+    def get_users_by_rol(self, rol: UserRole, activo: bool = True) -> List[User]:
+        """Obtiene usuarios filtrados por rol"""
+        return self.repository.get_by_rol(rol, activo)
+
     def update_user(self, user_id: UUID, user_data: UserUpdate) -> User:
         """Actualiza un usuario existente"""
         user = self.repository.get_by_id(user_id)
@@ -277,28 +345,16 @@ class UserService(BaseCRUDService):
         if not verify_password(password_data.contrasena_actual, user.contrasena_hash):
             raise ValueError("Contraseña actual incorrecta")
 
-        # Establecer nueva contraseña
+        # Actualizar contraseña
         user.contrasena_hash = get_password_hash(password_data.contrasena_nueva)
         user.fecha_actualizacion = datetime.now(timezone.utc)
 
         return self.repository.update(user)
 
     def deactivate_user(self, user_id: UUID) -> User:
-        """Desactiva un usuario (borrado lógico)"""
+        """Desactiva un usuario (soft delete)"""
         user = self.repository.get_by_id(user_id)
         if not user:
             raise ValueError(self.USER_NOT_FOUND_MSG)
 
         return self.repository.soft_delete(user)
-
-    def search_users(self, search_term: str, skip: int = 0, limit: int = 100) -> List[User]:
-        """Busca usuarios por nombre o correo"""
-        return self.repository.search(search_term, skip, limit)
-
-    def get_users_by_rol(self, rol: str, activo: bool = True) -> List[User]:
-        """Obtiene usuarios por rol"""
-        try:
-            user_role = UserRole(rol)
-            return self.repository.get_by_rol(user_role, activo)
-        except ValueError:
-            raise ValueError(f"Rol no válido: {rol}")

@@ -34,7 +34,7 @@ from app.services.notifications.scheduler_service import (
 
 from app.services.notifications.notification_service import NotificationService
 
-__all__ = [
+_all_ = [
     # Plantillas
     'EmailTemplate',
     'AppointmentConfirmationTemplate',

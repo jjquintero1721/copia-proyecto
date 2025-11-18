@@ -1,5 +1,6 @@
 """
 Schemas de Propietario - Validación con Pydantic
+CORRECCIÓN ARQUITECTURAL: Incluye usuario_id en las respuestas
 """
 
 from pydantic import BaseModel, EmailStr, Field
@@ -12,28 +13,49 @@ from datetime import datetime
 class OwnerCreate(BaseModel):
     """
     Esquema de validación para la creación de un propietario.
-    Define los campos requeridos y sus restricciones.
+
+
+    Los propietarios se crean automáticamente al registrar un usuario
+    con rol PROPIETARIO mediante POST /auth/register.
+
+    Se mantiene por compatibilidad con código existente.
     """
-    nombre: str = Field(..., min_length=3, max_length=120)  # Nombre del propietario (obligatorio)
-    correo: EmailStr  # Correo electrónico con validación automática de formato
-    documento: str = Field(..., min_length=3, max_length=50)  # Documento de identificación (obligatorio)
-    telefono: Optional[str] = Field(None, max_length=20)  # Teléfono opcional
+    nombre: str = Field(..., min_length=3, max_length=120)
+    correo: EmailStr
+    documento: str = Field(..., min_length=3, max_length=50)
+    telefono: Optional[str] = Field(None, max_length=20)
 
 
 # ==================== SCHEMA DE SALIDA: RESPUESTA PROPIETARIO ====================
 class OwnerResponse(BaseModel):
     """
     Esquema de respuesta que representa los datos de un propietario.
-    Se usa al devolver información al cliente.
+
+    Incluye usuario_id para mostrar la relación
     """
-    id: UUID  # Identificador único del propietario
+    id: UUID
+    usuario_id: UUID
     nombre: str
     correo: EmailStr
     documento: str
     telefono: Optional[str]
-    activo: bool  # Estado del propietario (activo o no)
-    fecha_creacion: datetime  # Fecha en la que se registró el propietario
+    activo: bool
+    fecha_creacion: datetime
 
     class Config:
-        # Permite crear instancias del modelo a partir de objetos ORM (como los de SQLAlchemy)
+        from_attributes = True
+
+
+# ==================== SCHEMA DE ACTUALIZACIÓN ====================
+class OwnerUpdate(BaseModel):
+    """
+    Esquema para actualizar datos de un propietario existente.
+    Todos los campos son opcionales.
+    """
+    nombre: Optional[str] = Field(None, min_length=3, max_length=120)
+    telefono: Optional[str] = Field(None, max_length=20)
+    documento: Optional[str] = Field(None, min_length=3, max_length=50)
+    activo: Optional[bool] = None
+
+    class Config:
         from_attributes = True

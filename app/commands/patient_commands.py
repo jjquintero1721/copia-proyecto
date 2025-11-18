@@ -8,30 +8,6 @@ from app.services.pet_service import CreatePetService
 from app.services.decorators import AuditDecorator
 
 
-# ==================== COMANDO: CREACIÓN DE PROPIETARIO ====================
-class CreateOwnerCommand:
-    # Constructor: inicializa los datos necesarios para crear un propietario
-    def __init__(self, db: Session, nombre: str, correo: str, documento: str, telefono: Optional[str] = None):
-        self.db = db  # Sesión de base de datos
-        self.nombre = nombre  # Nombre del propietario
-        self.correo = correo  # Correo electrónico del propietario
-        self.documento = documento  # Documento de identificación
-        self.telefono = telefono  # Teléfono (opcional)
-
-    # Método principal que ejecuta el comando
-    def execute(self):
-        # Crea una instancia del servicio responsable de crear propietarios
-        service = CreateOwnerService(
-            db=self.db,
-            nombre=self.nombre,
-            correo=self.correo,
-            documento=self.documento,
-            telefono=self.telefono,
-        )
-        # Aplica el decorador de auditoría y ejecuta la operación
-        return AuditDecorator(service).execute()
-
-
 # ==================== COMANDO: CREACIÓN DE MASCOTA ====================
 class CreatePetCommand:
     # Constructor: inicializa los datos necesarios para registrar una mascota

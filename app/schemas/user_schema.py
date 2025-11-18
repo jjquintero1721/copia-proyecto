@@ -1,95 +1,104 @@
 """
 Schemas de Usuario - Validación con Pydantic
-Define la estructura y validación de datos de entrada/salida
+RF-01: Registro de usuarios
+RF-02: Gestión de usuarios internos
+CORRECCIÓN ARQUITECTURAL: Incluye documento para propietarios
 """
 
-from pydantic import BaseModel, EmailStr, Field, field_validator
+from pydantic import BaseModel, EmailStr, Field
 from typing import Optional
+from uuid import UUID
 from datetime import datetime
 from enum import Enum
 
 
+# ==================== ENUM DE ROLES ====================
 class UserRoleEnum(str, Enum):
-    """Enumeración de roles para validación"""
+    """Enumeración de roles para validación de entrada"""
     SUPERADMIN = "superadmin"
     VETERINARIO = "veterinario"
     AUXILIAR = "auxiliar"
     PROPIETARIO = "propietario"
 
 
+# ==================== SCHEMA DE ENTRADA: CREAR USUARIO ====================
 class UserCreate(BaseModel):
-    """Schema para crear un usuario"""
+    """
+    Esquema de validación para la creación de un usuario.
+
+    Incluye documento opcional
+    - Requerido cuando rol = PROPIETARIO
+    - Opcional para otros roles
+    """
     nombre: str = Field(..., min_length=3, max_length=100)
     correo: EmailStr
     telefono: Optional[str] = Field(None, max_length=20)
     contrasena: str = Field(..., min_length=8, max_length=50)
-    rol: UserRoleEnum
+    rol: UserRoleEnum = Field(default=UserRoleEnum.PROPIETARIO)
 
-    @field_validator('telefono')
-    @classmethod
-    def validate_telefono(cls, value):
-        if value and not value.replace('+', '').replace(' ', '').replace('-', '').isdigit():
-            raise ValueError('El teléfono solo debe contener números y caracteres +, -, espacio')
-        return value
-
-    @field_validator('contrasena')
-    @classmethod
-    def validate_contrasena(cls, value):
-        if len(value) < 8:
-            raise ValueError('La contraseña debe tener al menos 8 caracteres')
-        if not any(char.isdigit() for char in value):
-            raise ValueError('La contraseña debe contener al menos un número')
-        if not any(char.isupper() for char in value):
-            raise ValueError('La contraseña debe contener al menos una mayúscula')
-        return value
+    # documento para propietarios
+    documento: Optional[str] = Field(
+        None,
+        min_length=3,
+        max_length=50,
+        description="Documento de identidad (requerido para propietarios)"
+    )
 
 
-class UserUpdate(BaseModel):
-    """Schema para actualizar un usuario"""
-    nombre: Optional[str] = Field(None, min_length=3, max_length=100)
-    telefono: Optional[str] = Field(None, max_length=20)
-    activo: Optional[bool] = None
-
-
-class UserChangePassword(BaseModel):
-    """Schema para cambiar contraseña"""
-    contrasena_actual: str
-    contrasena_nueva: str = Field(..., min_length=8, max_length=50)
-
-    @field_validator('contrasena_nueva')
-    @classmethod
-    def validate_contrasena_nueva(cls, value):
-        if len(value) < 8:
-            raise ValueError('La contraseña debe tener al menos 8 caracteres')
-        if not any(char.isdigit() for char in value):
-            raise ValueError('La contraseña debe contener al menos un número')
-        if not any(char.isupper() for char in value):
-            raise ValueError('La contraseña debe contener al menos una mayúscula')
-        return value
-
-
+# ==================== SCHEMA DE SALIDA: RESPUESTA USUARIO ====================
 class UserResponse(BaseModel):
-    """Schema de respuesta de usuario"""
-    id: str
+    """
+    Esquema de respuesta que representa los datos de un usuario.
+    Incluye propietario_id y documento si aplica
+    """
+    id: UUID
     nombre: str
-    correo: str
+    correo: EmailStr
     telefono: Optional[str]
     rol: str
     activo: bool
     fecha_creacion: datetime
 
+    # Campos adicionales si es propietario
+    propietario_id: Optional[UUID] = None
+    documento: Optional[str] = None
+
     class Config:
         from_attributes = True
 
 
+# ==================== SCHEMA DE ACTUALIZACIÓN ====================
+class UserUpdate(BaseModel):
+    """Esquema para actualizar datos de un usuario existente"""
+    nombre: Optional[str] = Field(None, min_length=3, max_length=100)
+    telefono: Optional[str] = Field(None, max_length=20)
+    activo: Optional[bool] = None
+
+
+# ==================== SCHEMA DE CAMBIO DE CONTRASEÑA ====================
+class UserChangePassword(BaseModel):
+    """Esquema para cambiar la contraseña de un usuario"""
+    contrasena_actual: str = Field(..., min_length=8)
+    contrasena_nueva: str = Field(..., min_length=8, max_length=50)
+
+
+# ==================== SCHEMA DE LOGIN ====================
 class LoginRequest(BaseModel):
-    """Schema para login"""
+    """Esquema para solicitud de login"""
     correo: EmailStr
     contrasena: str
 
 
 class LoginResponse(BaseModel):
-    """Schema de respuesta de login"""
+    """Esquema de respuesta exitosa de login"""
     access_token: str
     token_type: str = "bearer"
     usuario: UserResponse
+
+
+# ==================== SCHEMA DE TOKEN ====================
+class TokenData(BaseModel):
+    """Esquema para datos del token JWT"""
+    correo: Optional[str] = None
+    user_id: Optional[str] = None
+    rol: Optional[str] = None

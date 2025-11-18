@@ -1,11 +1,13 @@
 """
 Modelo de Usuario - Representa la tabla de usuarios en la base de datos
 Roles: superadmin, veterinario, auxiliar, propietario
+CORRECCIÓN ARQUITECTURAL: Relación 1:1 con Owner cuando rol=propietario
 """
 
 from sqlalchemy import Column, String, Boolean, DateTime, Enum as SQLEnum
 from sqlalchemy.dialects.postgresql import UUID
-from datetime import datetime
+from sqlalchemy.orm import relationship
+from datetime import datetime, timezone
 import uuid
 import enum
 
@@ -22,8 +24,17 @@ class UserRole(str, enum.Enum):
 
 class User(Base):
     """
-    Modelo de Usuario
-    Implementa la entidad Usuario con diferentes roles y permisos
+    Modelo de Usuario - Autenticación y autorización
+
+    Implementa la entidad Usuario con diferentes roles y permisos.
+
+    Relación con Owner:
+    - Si rol = PROPIETARIO → debe existir un registro en tabla propietarios
+    - Relación 1:1 (un usuario propietario = un registro de propietario)
+
+    RF-01: Registro de usuarios
+    RF-02: Gestión de usuarios internos
+    RF-03: Inicio de sesión
     """
     __tablename__ = "usuarios"
 
@@ -36,16 +47,32 @@ class User(Base):
     activo = Column(Boolean, default=True, nullable=False)
 
     # Auditoría
-    fecha_creacion = Column(DateTime, default=datetime.utcnow, nullable=False)
-    fecha_actualizacion = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    fecha_creacion = Column(
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False
+    )
+    fecha_actualizacion = Column(
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc)
+    )
     creado_por = Column(UUID(as_uuid=True), nullable=True)
+
+    # Relación 1:1 con Owner (solo si rol = propietario)
+    propietario = relationship(
+        "Owner",
+        back_populates="usuario",
+        uselist=False,
+        cascade="all, delete-orphan"
+    )
 
     def __repr__(self):
         return f"<Usuario {self.nombre} - {self.rol}>"
 
     def to_dict(self):
         """Convierte el usuario a diccionario (sin contraseña)"""
-        return {
+        user_dict = {
             "id": str(self.id),
             "nombre": self.nombre,
             "correo": self.correo,
@@ -54,3 +81,10 @@ class User(Base):
             "activo": self.activo,
             "fecha_creacion": self.fecha_creacion.isoformat() if self.fecha_creacion else None
         }
+
+        # Incluir info del propietario si existe
+        if self.propietario:
+            user_dict["propietario_id"] = str(self.propietario.id)
+            user_dict["documento"] = self.propietario.documento
+
+        return user_dict

@@ -44,7 +44,7 @@ class CacheProxy:
             ttl_seconds: int = DEFAULT_TTL_SECONDS
     ):
         """
-        Inicializa el proxies de caché
+        Inicializa el proxy de caché
 
         Args:
             real_service: Servicio real de citas (AppointmentService)
@@ -66,6 +66,8 @@ class CacheProxy:
         else:
             logger.info("CacheProxy inicializado con caché en memoria")
 
+    # ==================== Métodos con caché ====================
+
     def get_appointments_by_date(
             self,
             fecha: date,
@@ -76,19 +78,16 @@ class CacheProxy:
         # Generar clave de caché
         cache_key = self._generate_cache_key(fecha, veterinario_id)
 
-        # ✅ AGREGAR LOG AQUÍ
         logger.info(f"🔍 Buscando en caché: {cache_key}")
 
         # Intentar obtener del caché
         cached_data = self._get_from_cache(cache_key)
 
         if cached_data is not None:
-            # ✅ AGREGAR LOG AQUÍ
             logger.info(f"✅ Cache HIT para {cache_key}")
             appointments = self._deserialize_appointments(cached_data)
             return appointments
 
-        # ✅ AGREGAR LOG AQUÍ
         logger.info(f"❌ Cache MISS para {cache_key} - consultando BD")
 
         # Cache miss - consultar servicio real
@@ -97,45 +96,50 @@ class CacheProxy:
         )
 
         # Guardar en caché
-        self._save_to_cache(cache_key, appointments)
-        logger.info(f"💾 Guardado en caché: {cache_key} ({len(appointments)} citas)")
+        self._save_to_cache(cache_key, self._serialize_appointments(appointments))
 
         return appointments
 
-    def invalidate_cache(self, fecha: Optional[date] = None, veterinario_id: Optional[UUID] = None):
+    def get_appointment_by_id(self, appointment_id: UUID) -> Optional[Appointment]:
         """
-        Invalida el caché para una fecha específica o todo el caché
-
-        Se llama cuando:
-        - Se crea una nueva cita
-        - Se modifica una cita
-        - Se cancela una cita
-
-        Args:
-            fecha: Fecha específica a invalidar (None = todo)
-            veterinario_id: Veterinario específico (None = todos)
+        Obtiene una cita por ID (sin caché, ya que se modifica frecuentemente)
+        Delegación directa al servicio real
         """
-        if fecha is None:
-            # Invalidar todo el caché
-            self._invalidate_all()
-            logger.info("Caché completamente invalidado")
-        else:
-            # Invalidar fecha específica
-            cache_key = self._generate_cache_key(fecha, veterinario_id)
-            self._delete_from_cache(cache_key)
-            logger.info(f"Caché invalidado para fecha {fecha}")
+        return self._real_service.get_appointment_by_id(appointment_id)
 
-    # ==================== DELEGACIÓN A SERVICIO REAL ====================
-    # Estos métodos delegan directamente al servicio real e invalidan caché
+    def get_appointments(
+            self,
+            fecha: Optional[date] = None,
+            veterinario_id: Optional[UUID] = None,
+            estado: Optional[AppointmentStatus] = None
+    ) -> List[Appointment]:
+        """
+        Obtiene citas con filtros (usa caché solo para fecha específica)
+        """
+        # Solo usar caché si se especifica fecha
+        if fecha is not None:
+            return self.get_appointments_by_date(fecha, veterinario_id)
 
-    def create_appointment(self, appointment_data: Any, creado_por: Optional[UUID] = None) -> Appointment:
-        """Crea cita e invalida caché del día"""
+        # Sin fecha específica, consultar directamente
+        return self._real_service.get_appointments(fecha, veterinario_id, estado)
+
+    # ==================== Métodos que invalidan caché ====================
+
+    def create_appointment(
+            self,
+            appointment_data: Any,
+            creado_por: Optional[UUID] = None
+    ) -> Appointment:
+        """
+        Crea una cita e invalida el caché del día correspondiente
+        """
+        # Delegar al servicio real
         appointment = self._real_service.create_appointment(appointment_data, creado_por)
 
         # Invalidar caché del día de la cita
-        fecha = appointment.fecha_hora.date()
-        self.invalidate_cache(fecha)
+        self._invalidate_date_cache(appointment.fecha_hora.date())
 
+        logger.info(f"Cita creada: {appointment.id}, caché invalidado")
         return appointment
 
     def reschedule_appointment(
@@ -144,79 +148,204 @@ class CacheProxy:
             nueva_fecha: datetime,
             usuario_id: Optional[UUID] = None
     ) -> Appointment:
-        """Reprograma cita e invalida caché de ambas fechas"""
-        # Obtener cita original para invalidar su fecha
-        original = self._real_service.get_appointment_by_id(appointment_id)
+        """
+        Reprograma una cita e invalida caché de fechas involucradas
+        """
+        # Obtener cita original para saber su fecha anterior
+        original_appointment = self._real_service.get_appointment_by_id(appointment_id)
 
-        # Reprogramar
+        if original_appointment:
+            fecha_original = original_appointment.fecha_hora.date()
+        else:
+            fecha_original = None
+
+        # Delegar al servicio real
         appointment = self._real_service.reschedule_appointment(
             appointment_id, nueva_fecha, usuario_id
         )
 
-        # Invalidar ambas fechas
-        if original:
-            self.invalidate_cache(original.fecha_hora.date())
-        self.invalidate_cache(nueva_fecha.date())
+        # Invalidar caché de ambas fechas
+        if fecha_original:
+            self._invalidate_date_cache(fecha_original)
 
+        self._invalidate_date_cache(nueva_fecha.date())
+
+        logger.info(f"Cita {appointment_id} reprogramada, caché invalidado")
         return appointment
 
     def cancel_appointment(
             self,
             appointment_id: UUID,
-            motivo_cancelacion: str,
             usuario_id: Optional[UUID] = None
     ) -> Appointment:
-        """Cancela cita e invalida caché"""
-        appointment = self._real_service.cancel_appointment(
-            appointment_id, motivo_cancelacion, usuario_id
+        """
+        Cancela una cita e invalida el caché del día correspondiente
+        """
+        # Obtener cita para saber su fecha
+        original_appointment = self._real_service.get_appointment_by_id(appointment_id)
+
+        # Delegar al servicio real
+        appointment = self._real_service.cancel_appointment(appointment_id, usuario_id)
+
+        # Invalidar caché del día
+        if original_appointment:
+            self._invalidate_date_cache(original_appointment.fecha_hora.date())
+
+        logger.info(f"Cita {appointment_id} cancelada, caché invalidado")
+        return appointment
+
+    def confirm_appointment(
+            self,
+            appointment_id: UUID,
+            usuario_id: Optional[UUID] = None
+    ) -> Appointment:
+        """
+        Confirma una cita e invalida el caché del día correspondiente
+        """
+        # Obtener cita para saber su fecha
+        original_appointment = self._real_service.get_appointment_by_id(appointment_id)
+
+        # Delegar al servicio real
+        appointment = self._real_service.confirm_appointment(appointment_id, usuario_id)
+
+        # Invalidar caché del día
+        if original_appointment:
+            self._invalidate_date_cache(original_appointment.fecha_hora.date())
+
+        logger.info(f"Cita {appointment_id} confirmada, caché invalidado")
+        return appointment
+
+    def start_appointment(
+            self,
+            appointment_id: UUID,
+            usuario_id: Optional[UUID] = None
+    ) -> Appointment:
+        """
+        Inicia una cita e invalida el caché del día correspondiente
+        """
+        # Obtener cita para saber su fecha
+        original_appointment = self._real_service.get_appointment_by_id(appointment_id)
+
+        # Delegar al servicio real
+        appointment = self._real_service.start_appointment(appointment_id, usuario_id)
+
+        # Invalidar caché del día
+        if original_appointment:
+            self._invalidate_date_cache(original_appointment.fecha_hora.date())
+
+        logger.info(f"Cita {appointment_id} iniciada, caché invalidado")
+        return appointment
+
+    def complete_appointment(
+            self,
+            appointment_id: UUID,
+            notas: Optional[str] = None,
+            usuario_id: Optional[UUID] = None
+    ) -> Appointment:
+        """
+        Completa una cita e invalida el caché del día correspondiente
+        """
+        # Obtener cita para saber su fecha
+        original_appointment = self._real_service.get_appointment_by_id(appointment_id)
+
+        # Delegar al servicio real
+        appointment = self._real_service.complete_appointment(
+            appointment_id, notas, usuario_id
         )
 
         # Invalidar caché del día
-        fecha = appointment.fecha_hora.date()
-        self.invalidate_cache(fecha)
+        if original_appointment:
+            self._invalidate_date_cache(original_appointment.fecha_hora.date())
 
+        logger.info(f"Cita {appointment_id} completada, caché invalidado")
         return appointment
 
-    def get_appointment_by_id(self, appointment_id: UUID) -> Optional[Appointment]:
-        """Obtiene cita por ID (sin caché, consulta directa)"""
-        return self._real_service.get_appointment_by_id(appointment_id)
-
-    def get_all_appointments(self, **kwargs) -> List[Appointment]:
-        """Obtiene todas las citas (sin caché, consulta directa)"""
-        return self._real_service.get_all_appointments(**kwargs)
-
-    # ==================== MÉTODOS PRIVADOS DE CACHÉ ====================
-
-    def _generate_cache_key(self, fecha: date, veterinario_id: Optional[UUID] = None) -> str:
+    def check_availability(
+            self,
+            veterinario_id: UUID,
+            fecha_hora: datetime,
+            duracion_minutos: int
+    ) -> bool:
         """
-        Genera clave única para el caché
-
-        Formato: gdcv:appointments:YYYY-MM-DD[:veterinario_id]
+        Verifica disponibilidad (sin caché, necesita datos en tiempo real)
         """
-        key = f"{self.CACHE_KEY_PREFIX}{fecha.isoformat()}"
+        return self._real_service.check_availability(
+            veterinario_id, fecha_hora, duracion_minutos
+        )
+
+    # ==================== Métodos privados de caché ====================
+
+    def _generate_cache_key(
+            self,
+            fecha: date,
+            veterinario_id: Optional[UUID] = None
+    ) -> str:
+        """Genera una clave única para el caché"""
+        fecha_str = fecha.strftime("%Y-%m-%d")
 
         if veterinario_id:
-            key = f"{key}:{str(veterinario_id)}"
+            return f"{self.CACHE_KEY_PREFIX}{fecha_str}:vet:{veterinario_id}"
 
-        return key
+        return f"{self.CACHE_KEY_PREFIX}{fecha_str}:all"
 
     def _get_from_cache(self, cache_key: str) -> Optional[Any]:
         """Obtiene datos del caché (Redis o memoria)"""
         if self._use_redis:
             return self._get_from_redis(cache_key)
+
         return self._get_from_memory(cache_key)
 
-    def _save_to_cache(self, cache_key: str, appointments: List[Appointment]):
-        """Guarda datos en caché (Redis o memoria)"""
-        serialized = self._serialize_appointments(appointments)
-
+    def _save_to_cache(self, cache_key: str, data: Any):
+        """Guarda datos en el caché (Redis o memoria)"""
         if self._use_redis:
-            self._save_to_redis(cache_key, serialized)
+            self._save_to_redis(cache_key, data)
         else:
-            self._save_to_memory(cache_key, serialized)
+            self._save_to_memory(cache_key, data)
 
-    def _delete_from_cache(self, cache_key: str):
-        """Elimina entrada del caché"""
+    def _serialize_appointments(self, appointments: List[Appointment]) -> List[dict]:
+        """Serializa citas a diccionarios para almacenar en caché"""
+        return [apt.to_dict() for apt in appointments]
+
+    def _deserialize_appointments(self, data: List[dict]) -> List[Appointment]:
+        """
+        Deserializa citas desde diccionarios
+        NOTA: Esto retorna objetos Mock, no instancias completas de Appointment
+        Para uso en producción, considera hidratar desde BD
+        """
+        # Crear objetos Appointment simulados desde los datos en caché
+        from app.models.appointment import Appointment as AppointmentModel
+
+        appointments = []
+        for apt_data in data:
+            # Reconstruir el objeto básico
+            apt = AppointmentModel()
+            for key, value in apt_data.items():
+                setattr(apt, key, value)
+            appointments.append(apt)
+
+        return appointments
+
+    def _invalidate_date_cache(self, fecha: date):
+        """Invalida el caché de una fecha específica"""
+        # Invalidar caché general del día
+        cache_key_all = self._generate_cache_key(fecha, None)
+        self._invalidate_cache(cache_key_all)
+
+        # En producción, también deberías invalidar cachés específicos por veterinario
+        # Para simplificar, invalidamos todo el patrón de esa fecha
+        if self._use_redis:
+            try:
+                fecha_str = fecha.strftime("%Y-%m-%d")
+                pattern = f"{self.CACHE_KEY_PREFIX}{fecha_str}:*"
+                keys = self._redis.keys(pattern)
+                if keys:
+                    self._redis.delete(*keys)
+                    logger.info(f"Caché invalidado para fecha {fecha_str}: {len(keys)} claves")
+            except Exception as exc:
+                logger.warning(f"Error invalidando Redis para fecha {fecha}: {exc}")
+
+    def _invalidate_cache(self, cache_key: str):
+        """Elimina una clave específica del caché"""
         if self._use_redis:
             try:
                 self._redis.delete(cache_key)
@@ -288,54 +417,17 @@ class CacheProxy:
             'expires_at': expires_at
         }
 
-    # ==================== SERIALIZACIÓN ====================
+    # ==================== Delegación dinámica ====================
 
-    def _serialize_appointments(self, appointments: List[Appointment]) -> List[dict]:
-        """Serializa lista de citas a diccionarios"""
-        return [self._appointment_to_dict(apt) for apt in appointments]
-
-    def _deserialize_appointments(self, data: List[dict]) -> List[Appointment]:
+    def __getattr__(self, name: str) -> Any:
         """
-        Deserializa diccionarios a objetos Appointment
+        Delegación dinámica de métodos no definidos explícitamente
+        Permite que el proxy sea transparente para otros métodos del servicio
 
-        Nota: Retorna objetos simples sin relaciones cargadas
-        Para obtener relaciones completas, usar get_appointment_by_id
+        Args:
+            name: Nombre del método o atributo
+
+        Returns:
+            Método o atributo del servicio real
         """
-        appointments = []
-
-        for item in data:
-            # Crear objeto Appointment desde dict
-            appointment = Appointment(
-                id=UUID(item['id']),
-                mascota_id=UUID(item['mascota_id']),
-                veterinario_id=UUID(item['veterinario_id']),
-                servicio_id=UUID(item['servicio_id']),
-                fecha_hora=datetime.fromisoformat(item['fecha_hora']),
-                motivo=item['motivo'],
-                estado=AppointmentStatus(item['estado']),
-                creado_por=UUID(item['creado_por']) if item.get('creado_por') else None
-            )
-
-            # Establecer timestamps
-            appointment.fecha_creacion = datetime.fromisoformat(item['fecha_creacion'])
-            appointment.fecha_actualizacion = datetime.fromisoformat(item['fecha_actualizacion'])
-
-            appointments.append(appointment)
-
-        return appointments
-
-    @staticmethod
-    def _appointment_to_dict(appointment: Appointment) -> dict:
-        """Convierte Appointment a diccionario serializable"""
-        return {
-            'id': str(appointment.id),
-            'mascota_id': str(appointment.mascota_id),
-            'veterinario_id': str(appointment.veterinario_id),
-            'servicio_id': str(appointment.servicio_id),
-            'fecha_hora': appointment.fecha_hora.isoformat(),
-            'motivo': appointment.motivo,
-            'estado': appointment.estado.value,
-            'creado_por': str(appointment.creado_por) if appointment.creado_por else None,
-            'fecha_creacion': appointment.fecha_creacion.isoformat(),
-            'fecha_actualizacion': appointment.fecha_actualizacion.isoformat()
-        }
+        return getattr(self._real_service, name)

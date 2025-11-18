@@ -14,7 +14,6 @@ import logging
 from typing import Optional, List, Any, Callable
 from datetime import datetime, date, timezone
 from uuid import UUID
-from functools import wraps
 
 from app.models.appointment import Appointment, AppointmentStatus
 from app.models.user import User, UserRole
@@ -46,6 +45,9 @@ class AuthProxy:
         'view_all_appointments': [UserRole.SUPERADMIN, UserRole.VETERINARIO, UserRole.AUXILIAR],
         'reschedule_appointment': [UserRole.SUPERADMIN, UserRole.VETERINARIO, UserRole.AUXILIAR, UserRole.PROPIETARIO],
         'cancel_appointment': [UserRole.SUPERADMIN, UserRole.VETERINARIO, UserRole.AUXILIAR, UserRole.PROPIETARIO],
+        'confirm_appointment': [UserRole.SUPERADMIN, UserRole.VETERINARIO, UserRole.AUXILIAR],
+        'start_appointment': [UserRole.SUPERADMIN, UserRole.VETERINARIO, UserRole.AUXILIAR],
+        'complete_appointment': [UserRole.SUPERADMIN, UserRole.VETERINARIO],
     }
 
     def __init__(
@@ -55,7 +57,7 @@ class AuthProxy:
             audit_callback: Optional[Callable] = None
     ):
         """
-        Inicializa el proxies de autorización
+        Inicializa el proxy de autorización
 
         Args:
             real_service: Servicio real de citas (AppointmentService o CacheProxy)
@@ -121,55 +123,30 @@ class AuthProxy:
 
         return appointment
 
-    def get_all_appointments(self, **kwargs) -> List[Appointment]:
+    def get_appointments(
+            self,
+            fecha: Optional[date] = None,
+            veterinario_id: Optional[UUID] = None,
+            estado: Optional[AppointmentStatus] = None
+    ) -> List[Appointment]:
         """
-        Obtiene todas las citas aplicando filtros según rol
+        Lista citas verificando permisos
 
         Reglas:
         - Staff puede ver todas las citas
-        - Clientes solo ven citas de sus mascotas
+        - Clientes solo pueden ver sus propias citas
         """
         self._verify_permission('view_all_appointments')
 
-        # Si es cliente, agregar filtro por propietario
-        if self._current_user.rol == UserRole.PROPIETARIO:
-            # Obtener IDs de mascotas del cliente
-            pet_ids = self._get_user_pet_ids()
-
-            # Si no tiene mascotas, retornar lista vacía
-            if not pet_ids:
-                return []
-
-            # Agregar filtro (solo si no se especificó mascota_id)
-            if 'mascota_id' not in kwargs or kwargs['mascota_id'] is None:
-                # Filtrar para obtener solo citas de las mascotas del cliente
-                all_appointments = self._real_service.get_all_appointments(**kwargs)
-                return [apt for apt in all_appointments if apt.mascota_id in pet_ids]
-
-        # Staff puede ver todas
-        return self._real_service.get_all_appointments(**kwargs)
-
-    def get_appointments_by_date(
-            self,
-            fecha: date,
-            veterinario_id: Optional[UUID] = None
-    ) -> List[Appointment]:
-        """
-        Obtiene citas por fecha verificando permisos
-
-        Reglas:
-        - Staff puede ver citas de cualquier fecha/veterinario
-        - Clientes solo ven sus propias citas
-        """
-        self._verify_permission('view_all_appointments')
-
-        # Obtener citas
-        appointments = self._real_service.get_appointments_by_date(fecha, veterinario_id)
+        # Delegar al servicio real
+        appointments = self._real_service.get_appointments(fecha, veterinario_id, estado)
 
         # Si es cliente, filtrar solo sus citas
         if self._current_user.rol == UserRole.PROPIETARIO:
-            pet_ids = self._get_user_pet_ids()
-            appointments = [apt for apt in appointments if apt.mascota_id in pet_ids]
+            appointments = [
+                apt for apt in appointments
+                if apt.mascota.propietario_id == self._current_user.id
+            ]
 
         return appointments
 
@@ -213,7 +190,6 @@ class AuthProxy:
     def cancel_appointment(
             self,
             appointment_id: UUID,
-            motivo_cancelacion: str,
             usuario_id: Optional[UUID] = None
     ) -> Appointment:
         """
@@ -233,8 +209,7 @@ class AuthProxy:
 
         # Auditar acción
         self._log_action('cancel_appointment', {
-            'appointment_id': str(appointment_id),
-            'motivo': motivo_cancelacion
+            'appointment_id': str(appointment_id)
         })
 
         # Establecer usuario_id como usuario actual si no se especifica
@@ -242,15 +217,108 @@ class AuthProxy:
             usuario_id = self._current_user.id
 
         # Delegar al servicio real
-        return self._real_service.cancel_appointment(
-            appointment_id, motivo_cancelacion, usuario_id
+        return self._real_service.cancel_appointment(appointment_id, usuario_id)
+
+    def confirm_appointment(
+            self,
+            appointment_id: UUID,
+            usuario_id: Optional[UUID] = None
+    ) -> Appointment:
+        """
+        Confirma una cita verificando permisos
+
+        Reglas:
+        - Solo staff puede confirmar citas
+        """
+        self._verify_permission('confirm_appointment')
+
+        # Auditar acción
+        self._log_action('confirm_appointment', {
+            'appointment_id': str(appointment_id)
+        })
+
+        # Establecer usuario_id como usuario actual si no se especifica
+        if usuario_id is None:
+            usuario_id = self._current_user.id
+
+        # Delegar al servicio real
+        return self._real_service.confirm_appointment(appointment_id, usuario_id)
+
+    def start_appointment(
+            self,
+            appointment_id: UUID,
+            usuario_id: Optional[UUID] = None
+    ) -> Appointment:
+        """
+        Inicia una cita verificando permisos
+
+        Reglas:
+        - Solo staff (veterinarios y auxiliares) puede iniciar citas
+        - La cita debe estar en estado CONFIRMADA
+        """
+        self._verify_permission('start_appointment')
+
+        # Auditar acción
+        self._log_action('start_appointment', {
+            'appointment_id': str(appointment_id)
+        })
+
+        # Establecer usuario_id como usuario actual si no se especifica
+        if usuario_id is None:
+            usuario_id = self._current_user.id
+
+        # Delegar al servicio real
+        return self._real_service.start_appointment(appointment_id, usuario_id)
+
+    def complete_appointment(
+            self,
+            appointment_id: UUID,
+            notas: Optional[str] = None,
+            usuario_id: Optional[UUID] = None
+    ) -> Appointment:
+        """
+        Completa una cita verificando permisos
+
+        Reglas:
+        - Solo veterinarios pueden completar citas
+        - La cita debe estar en estado EN_PROCESO
+        """
+        self._verify_permission('complete_appointment')
+
+        # Auditar acción
+        self._log_action('complete_appointment', {
+            'appointment_id': str(appointment_id),
+            'notas_agregadas': notas is not None
+        })
+
+        # Establecer usuario_id como usuario actual si no se especifica
+        if usuario_id is None:
+            usuario_id = self._current_user.id
+
+        # Delegar al servicio real
+        return self._real_service.complete_appointment(
+            appointment_id, notas, usuario_id
         )
 
-    # ==================== MÉTODOS PRIVADOS DE AUTORIZACIÓN ====================
-
-    def _verify_permission(self, operation: str):
+    def check_availability(
+            self,
+            veterinario_id: UUID,
+            fecha_hora: datetime,
+            duracion_minutos: int
+    ) -> bool:
         """
-        Verifica que el usuario tenga permiso para la operación
+        Verifica disponibilidad sin restricciones de permisos
+        (Consulta de solo lectura)
+        """
+        return self._real_service.check_availability(
+            veterinario_id, fecha_hora, duracion_minutos
+        )
+
+    # ==================== Métodos privados de validación ====================
+
+    def _verify_permission(self, operation: str) -> None:
+        """
+        Verifica si el usuario tiene permiso para ejecutar una operación
 
         Args:
             operation: Nombre de la operación
@@ -262,16 +330,21 @@ class AuthProxy:
 
         if self._current_user.rol not in allowed_roles:
             logger.warning(
-                f"Permiso denegado: {self._current_user.correo} "
-                f"intentó {operation} sin permisos"
+                f"⚠️ Permiso denegado: {self._current_user.correo} "
+                f"({self._current_user.rol.value}) intentó ejecutar {operation}"
             )
             raise PermissionDeniedException(
-                f"No tiene permisos para realizar esta operación: {operation}"
+                f"No tienes permisos para realizar esta acción: {operation}"
             )
 
-    def _verify_pet_ownership(self, mascota_id: UUID):
+        logger.info(
+            f"✅ Permiso concedido: {self._current_user.correo} "
+            f"puede ejecutar {operation}"
+        )
+
+    def _verify_pet_ownership(self, mascota_id: UUID) -> None:
         """
-        Verifica que la mascota pertenezca al usuario actual
+        Verifica que una mascota pertenezca al usuario actual
 
         Args:
             mascota_id: ID de la mascota
@@ -279,21 +352,28 @@ class AuthProxy:
         Raises:
             PermissionDeniedException: Si la mascota no pertenece al usuario
         """
-        # Obtener mascota del servicio real
-        pet_ids = self._get_user_pet_ids()
+        from app.repositories.pet_repository import PetRepository
 
-        if mascota_id not in pet_ids:
+        # Obtener repositorio
+        pet_repo = PetRepository(self._real_service.db)
+        mascota = pet_repo.get_by_id(mascota_id)
+
+        if not mascota:
+            raise ValueError("La mascota no existe")
+
+        if mascota.propietario_id != self._current_user.id:
             logger.warning(
-                f"Acceso denegado: {self._current_user.correo} "
-                f"intentó acceder a mascota {mascota_id} que no le pertenece"
+                f"⚠️ Usuario {self._current_user.correo} intentó acceder "
+                f"a mascota que no le pertenece: {mascota_id}"
             )
             raise PermissionDeniedException(
-                "No tiene permisos para acceder a esta mascota"
+                "No tienes permisos para realizar acciones sobre esta mascota"
             )
 
-    def _verify_appointment_ownership(self, appointment: Appointment):
+    def _verify_appointment_ownership(self, appointment: Appointment) -> None:
         """
-        Verifica que la cita pertenezca al usuario actual
+        Verifica que una cita pertenezca al usuario actual
+        (La mascota de la cita debe ser del usuario)
 
         Args:
             appointment: Cita a verificar
@@ -301,62 +381,47 @@ class AuthProxy:
         Raises:
             PermissionDeniedException: Si la cita no pertenece al usuario
         """
-        pet_ids = self._get_user_pet_ids()
-
-        if appointment.mascota_id not in pet_ids:
+        if appointment.mascota.propietario_id != self._current_user.id:
             logger.warning(
-                f"Acceso denegado: {self._current_user.correo} "
-                f"intentó acceder a cita {appointment.id} que no le pertenece"
+                f"⚠️ Usuario {self._current_user.correo} intentó acceder "
+                f"a cita que no le pertenece: {appointment.id}"
             )
             raise PermissionDeniedException(
-                "No tiene permisos para acceder a esta cita"
+                "No tienes permisos para acceder a esta cita"
             )
 
-    def _get_user_pet_ids(self) -> List[UUID]:
+    def _log_action(self, action: str, details: dict) -> None:
         """
-        Obtiene los IDs de las mascotas del usuario actual
-
-        Returns:
-            Lista de UUIDs de mascotas del usuario
-        """
-        # Si el servicio real tiene propietario_id, usamos el repositorio
-        # Para evitar circular dependency, accedemos al repositorio directamente
-        from app.repositories.pet_repository import PetRepository
-
-        # Obtener sesión de DB del servicio real
-        db_session = getattr(self._real_service, 'db', None)
-
-        if db_session is None:
-            return []
-
-        pet_repo = PetRepository(db_session)
-        pets = pet_repo.get_by_owner_and_name(self._current_user.id)
-
-        return [pet.id for pet in pets]
-
-    def _log_action(self, action: str, details: dict):
-        """
-        Registra la acción para auditoría
+        Registra una acción en el log de auditoría
 
         Args:
-            action: Nombre de la acción
+            action: Acción realizada
             details: Detalles de la acción
         """
-        log_entry = {
-            'timestamp': datetime.now(timezone.utc).isoformat(),
-            'user_id': str(self._current_user.id),
-            'user_email': self._current_user.correo,
-            'user_role': self._current_user.rol.value,
-            'action': action,
-            'details': details
-        }
-
-        # Si hay callback de auditoría, usarlo
         if self._audit:
-            try:
-                self._audit(log_entry)
-            except Exception as exc:
-                logger.error(f"Error en callback de auditoría: {exc}")
+            self._audit(
+                usuario=self._current_user,
+                accion=action,
+                detalles=details,
+                timestamp=datetime.now(timezone.utc)
+            )
 
-        # Siempre loguear
-        logger.info(f"Auditoría: {action} por {self._current_user.correo}")
+        logger.info(
+            f"📝 Acción auditada: {action} por {self._current_user.correo} "
+            f"- Detalles: {details}"
+        )
+
+    # ==================== Delegación dinámica ====================
+
+    def __getattr__(self, name: str) -> Any:
+        """
+        Delegación dinámica de métodos no definidos explícitamente
+        Permite que el proxy sea transparente para otros métodos del servicio
+
+        Args:
+            name: Nombre del método
+
+        Returns:
+            Método del servicio real
+        """
+        return getattr(self._real_service, name)
