@@ -5,7 +5,7 @@ RF-05: Gestión de citas
 
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_
-from typing import Optional, List
+from typing import Optional, List, Any
 from uuid import UUID
 from datetime import datetime, timedelta, timezone
 
@@ -141,7 +141,7 @@ class AppointmentRepository:
         hours_ahead: int = 24,
         skip: int = 0,
         limit: int = 100
-    ) -> List[Appointment]:
+    ) -> list[type[Appointment]]:
         """
         Obtiene citas próximas para recordatorios
         RF-06: Notificaciones por correo

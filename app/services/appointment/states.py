@@ -42,11 +42,35 @@ class AppointmentState(ABC):
         """Reprogramar la cita"""
         pass
 
+    def _ensure_timezone_aware(self, dt: datetime) -> datetime:
+        """
+        Asegura que un datetime tenga información de timezone.
+        Si no la tiene, asume UTC.
+
+        Args:
+            dt: datetime a verificar
+
+        Returns:
+            datetime con timezone UTC
+
+        Raises:
+            ValueError: Si dt es None
+        """
+        if dt is None:
+            raise ValueError("Datetime no puede ser None")
+
+        if dt.tzinfo is None:
+            # Si no tiene timezone, asumimos UTC
+            return dt.replace(tzinfo=timezone.utc)
+
+        return dt
+
     def _validar_anticipacion_cancelacion(self, cita: Appointment) -> bool:
         """
         RN08-2: Cancelaciones con menos de 4 horas deben registrarse como "cancelación tardía"
         """
-        now = datetime.now(timezone.utc)  # ← CAMBIAR AQUÍ
+        now = datetime.now(timezone.utc)
+        fecha_hora_aware = self._ensure_timezone_aware(cita.fecha_hora)
         diferencia = cita.fecha_hora - now
         return diferencia < timedelta(hours=4)
 
@@ -54,7 +78,8 @@ class AppointmentState(ABC):
         """
         RN08-3: Reprogramaciones solo se permiten hasta 2 horas antes
         """
-        now = datetime.now(timezone.utc)  # ← CAMBIAR AQUÍ
+        now = datetime.now(timezone.utc)
+        fecha_hora_aware = self._ensure_timezone_aware(cita.fecha_hora)
         diferencia = cita.fecha_hora - now
         return diferencia >= timedelta(hours=2)
 

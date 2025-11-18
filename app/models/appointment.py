@@ -7,7 +7,7 @@ Implementa State Pattern para gestión de estados
 from sqlalchemy import Column, String, DateTime, Boolean, ForeignKey, Text, Enum as SQLEnum
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
-from datetime import datetime
+from datetime import datetime, timezone
 import uuid
 import enum
 
@@ -65,8 +65,8 @@ class Appointment(Base):
     notas = Column(Text, nullable=True)
 
     # Auditoría
-    fecha_creacion = Column(DateTime, default=datetime.utcnow, nullable=False)
-    fecha_actualizacion = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    fecha_creacion = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+    fecha_actualizacion = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     creado_por = Column(UUID(as_uuid=True), nullable=True)
 
     # Relationships
@@ -78,17 +78,47 @@ class Appointment(Base):
     def __repr__(self):
         return f"<Cita {self.fecha_hora} - {self.estado.value}>"
 
+    @staticmethod
+    def _ensure_timezone_aware(dt: datetime) -> datetime:
+        """
+        Asegura que un datetime tenga información de timezone.
+        Si no la tiene, asume UTC.
+
+        Args:
+            dt: datetime a verificar
+
+        Returns:
+            datetime con timezone
+        """
+        if dt is None:
+            return None
+        if dt.tzinfo is None:
+            return dt.replace(tzinfo=timezone.utc)
+        return dt
+
+    def get_fecha_hora_aware(self) -> datetime:
+        """
+        Obtiene fecha_hora asegurando que sea timezone-aware
+
+        Returns:
+            datetime con timezone UTC
+        """
+        return self._ensure_timezone_aware(self.fecha_hora)
+
     def to_dict(self):
         """Convierte la cita a diccionario"""
+
+        fecha_hora_aware = self._ensure_timezone_aware(self.fecha_hora)
+        fecha_creacion_aware = self._ensure_timezone_aware(self.fecha_creacion)
         return {
             "id": str(self.id),
             "mascota_id": str(self.mascota_id),
             "veterinario_id": str(self.veterinario_id),
             "servicio_id": str(self.servicio_id),
-            "fecha_hora": self.fecha_hora.isoformat() if self.fecha_hora else None,
+            "fecha_hora": fecha_hora_aware.isoformat() if fecha_hora_aware else None,
             "estado": self.estado.value,
             "motivo": self.motivo,
             "cancelacion_tardia": self.cancelacion_tardia,
             "notas": self.notas,
-            "fecha_creacion": self.fecha_creacion.isoformat() if self.fecha_creacion else None
+            "fecha_creacion": fecha_creacion_aware.isoformat() if fecha_creacion_aware else None
         }

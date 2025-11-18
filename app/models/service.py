@@ -5,7 +5,7 @@ RF-09: Gestión de servicios (consultas, vacunas, cirugías, etc.)
 
 from sqlalchemy import Column, String, DateTime, Boolean, Integer, Float
 from sqlalchemy.dialects.postgresql import UUID
-from datetime import datetime
+from datetime import datetime, timezone
 import uuid
 
 from app.database import Base
@@ -36,8 +36,16 @@ class Service(Base):
     activo = Column(Boolean, default=True, nullable=False)
 
     # Auditoría
-    fecha_creacion = Column(DateTime, default=datetime.utcnow, nullable=False)
-    fecha_actualizacion = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    fecha_creacion = Column(
+        DateTime(timezone=True),  # ← Agregar timezone=True
+        default=lambda: datetime.now(timezone.utc),  # ← Usar lambda y timezone.utc
+        nullable=False
+    )
+    fecha_actualizacion = Column(
+        DateTime(timezone=True),  # ← Agregar timezone=True
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc)  # ← Usar lambda
+    )
     creado_por = Column(UUID(as_uuid=True), nullable=True)
 
     def __repr__(self):
