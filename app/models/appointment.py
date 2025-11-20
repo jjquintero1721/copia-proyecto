@@ -79,7 +79,7 @@ class Appointment(Base):
         return f"<Cita {self.fecha_hora} - {self.estado.value}>"
 
     @staticmethod
-    def _ensure_timezone_aware(dt: datetime) -> datetime:
+    def _ensure_timezone_aware(dt: datetime) -> datetime | None:
         """
         Asegura que un datetime tenga información de timezone.
         Si no la tiene, asume UTC.

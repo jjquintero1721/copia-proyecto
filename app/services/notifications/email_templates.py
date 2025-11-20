@@ -32,6 +32,9 @@ class EmailTemplate(ABC):
         self.support_email = "soporte@gdcv.com"
         self.phone_number = "+57 300 123 4567"
 
+    MSG_MASCOTA = "tu mascota"
+    MSG_DOCTORA = "Dr./Dra."
+
     @abstractmethod
     def get_subject(self, context: Dict[str, Any]) -> str:
         """Retorna el asunto del correo"""
@@ -163,11 +166,11 @@ class AppointmentConfirmationTemplate(EmailTemplate):
         return f"✅ Cita confirmada - {context.get('mascota_nombre', 'Mascota')}"
 
     def get_body(self, context: Dict[str, Any]) -> str:
-        mascota_nombre = context.get("mascota_nombre", "tu mascota")
+        mascota_nombre = context.get("mascota_nombre", self.MSG_MASCOTA)
         propietario_nombre = context.get("propietario_nombre", "Cliente")
         fecha_hora = context.get("fecha_hora", "")
         servicio_nombre = context.get("servicio_nombre", "Consulta")
-        veterinario_nombre = context.get("veterinario_nombre", "Dr./Dra.")
+        veterinario_nombre = context.get("veterinario_nombre", self.MSG_MASCOTA)
 
         return f"""
             <h2>¡Cita confirmada exitosamente! 🎉</h2>
@@ -193,11 +196,11 @@ class AppointmentConfirmationTemplate(EmailTemplate):
         """
 
     def _generate_text_version(self, context: Dict[str, Any]) -> str:
-        mascota_nombre = context.get("mascota_nombre", "tu mascota")
+        mascota_nombre = context.get("mascota_nombre", self.MSG_MASCOTA)
         propietario_nombre = context.get("propietario_nombre", "Cliente")
         fecha_hora = context.get("fecha_hora", "")
         servicio_nombre = context.get("servicio_nombre", "Consulta")
-        veterinario_nombre = context.get("veterinario_nombre", "Dr./Dra.")
+        veterinario_nombre = context.get("veterinario_nombre", self.MSG_MASCOTA)
 
         return f"""
 ¡Cita confirmada exitosamente!
@@ -229,11 +232,11 @@ class AppointmentReminderTemplate(EmailTemplate):
         return f"🔔 Recordatorio de cita mañana - {context.get('mascota_nombre', 'Mascota')}"
 
     def get_body(self, context: Dict[str, Any]) -> str:
-        mascota_nombre = context.get("mascota_nombre", "tu mascota")
+        mascota_nombre = context.get("mascota_nombre", self.MSG_MASCOTA)
         propietario_nombre = context.get("propietario_nombre", "Cliente")
         fecha_hora = context.get("fecha_hora", "")
         servicio_nombre = context.get("servicio_nombre", "Consulta")
-        veterinario_nombre = context.get("veterinario_nombre", "Dr./Dra.")
+        veterinario_nombre = context.get("veterinario_nombre", self.MSG_MASCOTA)
 
         return f"""
             <h2>🔔 Recordatorio: Cita mañana</h2>
@@ -268,11 +271,11 @@ class AppointmentReminderTemplate(EmailTemplate):
         """
 
     def _generate_text_version(self, context: Dict[str, Any]) -> str:
-        mascota_nombre = context.get("mascota_nombre", "tu mascota")
+        mascota_nombre = context.get("mascota_nombre", self.MSG_MASCOTA)
         propietario_nombre = context.get("propietario_nombre", "Cliente")
         fecha_hora = context.get("fecha_hora", "")
         servicio_nombre = context.get("servicio_nombre", "Consulta")
-        veterinario_nombre = context.get("veterinario_nombre", "Dr./Dra.")
+        veterinario_nombre = context.get("veterinario_nombre", self.MSG_DOCTORA)
 
         return f"""
 RECORDATORIO: Cita mañana
@@ -309,7 +312,7 @@ class AppointmentRescheduleTemplate(EmailTemplate):
         return f"🔄 Cita reprogramada - {context.get('mascota_nombre', 'Mascota')}"
 
     def get_body(self, context: Dict[str, Any]) -> str:
-        mascota_nombre = context.get("mascota_nombre", "tu mascota")
+        mascota_nombre = context.get("mascota_nombre", self.MSG_MASCOTA)
         propietario_nombre = context.get("propietario_nombre", "Cliente")
         fecha_anterior = context.get("fecha_anterior", "")
         fecha_nueva = context.get("fecha_nueva", "")
@@ -339,7 +342,7 @@ class AppointmentRescheduleTemplate(EmailTemplate):
         """
 
     def _generate_text_version(self, context: Dict[str, Any]) -> str:
-        mascota_nombre = context.get("mascota_nombre", "tu mascota")
+        mascota_nombre = context.get("mascota_nombre", self.MSG_MASCOTA)
         propietario_nombre = context.get("propietario_nombre", "Cliente")
         fecha_anterior = context.get("fecha_anterior", "")
         fecha_nueva = context.get("fecha_nueva", "")
@@ -371,7 +374,7 @@ class AppointmentCancellationTemplate(EmailTemplate):
         return f"❌ Cita cancelada - {context.get('mascota_nombre', 'Mascota')}"
 
     def get_body(self, context: Dict[str, Any]) -> str:
-        mascota_nombre = context.get("mascota_nombre", "tu mascota")
+        mascota_nombre = context.get("mascota_nombre", self.MSG_MASCOTA)
         propietario_nombre = context.get("propietario_nombre", "Cliente")
         fecha_hora = context.get("fecha_hora", "")
         cancelacion_tardia = context.get("cancelacion_tardia", False)
@@ -410,7 +413,7 @@ class AppointmentCancellationTemplate(EmailTemplate):
         """
 
     def _generate_text_version(self, context: Dict[str, Any]) -> str:
-        mascota_nombre = context.get("mascota_nombre", "tu mascota")
+        mascota_nombre = context.get("mascota_nombre", self.MSG_MASCOTA)
         propietario_nombre = context.get("propietario_nombre", "Cliente")
         fecha_hora = context.get("fecha_hora", "")
         cancelacion_tardia = context.get("cancelacion_tardia", False)

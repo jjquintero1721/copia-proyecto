@@ -230,57 +230,61 @@ class SendGridAdapter(EmailAdapter):
     def _build_sendgrid_message(self, message: EmailMessage) -> Mail:
         """
         Construye un mensaje Mail de SendGrid desde EmailMessage
-        Principio SRP: Responsabilidad única de construir mensaje SendGrid
+        SRP: esta función solo orquesta, delega pasos complejos
         """
-        # Email remitente
-        from_email_obj = Email(
+        from_email = self._build_from_email(message)
+        to_email = To(message.to)
+        content = self._build_main_content(message)
+
+        sg_message = Mail(
+            from_email=from_email,
+            to_emails=to_email,
+            subject=message.subject,
+            html_content=content,
+        )
+
+        self._add_optional_contents(sg_message, message)
+        self._add_recipients(sg_message, message)
+        self._add_headers(sg_message, message)
+        self._add_attachments_if_any(sg_message, message)
+
+        return sg_message
+
+    def _build_from_email(self, message: EmailMessage) -> Email:
+        return Email(
             message.from_email or self.from_email,
             message.from_name or self.from_name
         )
 
-        # Email destinatario
-        to_email_obj = To(message.to)
+    def _build_main_content(self, message: EmailMessage) -> Content:
+        body = message.body_html or message.body_text
+        return Content("text/html", body)
 
-        # Contenido
-        content = Content("text/html", message.body_html or message.body_text)
-
-        # Crear mensaje
-        sg_message = Mail(
-            from_email=from_email_obj,
-            to_emails=to_email_obj,
-            subject=message.subject,
-            html_content=content
-        )
-
-        # Añadir contenido alternativo en texto plano
+    def _add_optional_contents(self, sg_message: Mail, message: EmailMessage):
         if message.body_text and message.body_html:
             sg_message.add_content(Content("text/plain", message.body_text))
 
-        # CC
-        if message.cc:
-            for cc_email in message.cc:
-                sg_message.add_cc(cc_email)
-
-        # BCC
-        if message.bcc:
-            for bcc_email in message.bcc:
-                sg_message.add_bcc(bcc_email)
-
-        # Reply-To
         if message.reply_to:
             sg_message.reply_to = Email(message.reply_to)
 
-        # Headers personalizados
+    def _add_recipients(self, sg_message: Mail, message: EmailMessage):
+        if message.cc:
+            for cc in message.cc:
+                sg_message.add_cc(cc)
+
+        if message.bcc:
+            for bcc in message.bcc:
+                sg_message.add_bcc(bcc)
+
+    def _add_headers(self, sg_message: Mail, message: EmailMessage):
         if message.headers:
             for key, value in message.headers.items():
                 sg_message.add_header(key, value)
 
-        # Archivos adjuntos
+    def _add_attachments_if_any(self, sg_message: Mail, message: EmailMessage):
         if message.attachments:
             for attachment in message.attachments:
                 self._add_attachment(sg_message, attachment)
-
-        return sg_message
 
     def _add_attachment(self, sg_message: Mail, attachment: dict) -> None:
         """

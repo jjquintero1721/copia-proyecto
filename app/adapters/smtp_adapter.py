@@ -113,7 +113,7 @@ class SMTPAdapter(EmailAdapter):
             mime_message = self._build_mime_message(message)
 
             # Enviar usando SMTP
-            self._send_via_smtp(mime_message, message.to)
+            self._send_via_smtp(mime_message)
 
             logger.info(f"✅ Correo enviado exitosamente a {message.to}")
 
@@ -304,7 +304,7 @@ class SMTPAdapter(EmailAdapter):
         server.login(self.username, self.password)
         return server
 
-    def _send_via_smtp(self, mime_message: MIMEMultipart, to_email: str) -> None:
+    def _send_via_smtp(self, mime_message: MIMEMultipart) -> None:
         """
         Envía el mensaje MIME usando SMTP
         Principio SRP: Responsabilidad única de enviar

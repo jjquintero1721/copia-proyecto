@@ -71,7 +71,7 @@ class AppointmentState(ABC):
         """
         now = datetime.now(timezone.utc)
         fecha_hora_aware = self._ensure_timezone_aware(cita.fecha_hora)
-        diferencia = cita.fecha_hora - now
+        diferencia = fecha_hora_aware - now
         return diferencia < timedelta(hours=4)
 
     def _validar_anticipacion_reprogramacion(self, cita: Appointment) -> bool:
@@ -80,7 +80,7 @@ class AppointmentState(ABC):
         """
         now = datetime.now(timezone.utc)
         fecha_hora_aware = self._ensure_timezone_aware(cita.fecha_hora)
-        diferencia = cita.fecha_hora - now
+        diferencia = fecha_hora_aware - now
         return diferencia >= timedelta(hours=2)
 
 

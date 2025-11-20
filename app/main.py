@@ -119,7 +119,7 @@ app.include_router(
 
 app.include_router(
     notification_settings_controller.router,
-    prefix=f"/api/v1/notifications",
+    prefix="/api/v1/notifications",
     tags=["Notificaciones"]
 )
 

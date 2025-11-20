@@ -146,7 +146,7 @@ async def get_email_provider_info(
     Solo para staff/admin
     """
     try:
-        factory = EmailAdapterFactory()
+        EmailAdapterFactory()
         adapter = get_email_adapter()
 
         provider_name = adapter.get_provider_name()

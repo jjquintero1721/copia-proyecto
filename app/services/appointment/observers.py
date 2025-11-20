@@ -88,7 +88,7 @@ class NotificadorCorreo(AppointmentObserver):
 
             elif evento == "CITA_REPROGRAMADA":
                 # Enviar notificación de reprogramación
-                logger.info(f"   → Enviando notificación de reprogramación")
+                logger.info("   → Enviando notificación de reprogramación")
                 fecha_anterior = datos.get('fecha_anterior')
 
                 success = notification_service.send_appointment_reschedule_notification(
@@ -104,7 +104,7 @@ class NotificadorCorreo(AppointmentObserver):
 
             elif evento == "CITA_CANCELADA":
                 # Enviar notificación de cancelación
-                logger.info(f"   → Enviando notificación de cancelación")
+                logger.info("   → Enviando notificación de cancelación")
 
                 success = notification_service.send_appointment_cancellation_notification(
                     appointment_id=cita.id,
@@ -145,15 +145,6 @@ class RegistroAuditoria(AppointmentObserver):
         logger.info(f"   → Usuario: {datos.get('usuario_id', 'Sistema')}")
         logger.info(f"   → Detalles: {datos}")
 
-        # TODO: Implementar guardado en tabla de auditoría
-        # audit_record = AuditLog(
-        #     entidad="Cita",
-        #     entidad_id=cita.id,
-        #     accion=evento,
-        #     usuario_id=datos.get('usuario_id'),
-        #     detalles=json.dumps(datos),
-        #     fecha=datetime.now(timezone.utc)
-        # )
 
 
 class MetricasObserver(AppointmentObserver):
@@ -169,8 +160,6 @@ class MetricasObserver(AppointmentObserver):
 
         logger.info(f"📊 [Métricas] Evento: {evento}")
 
-        # TODO: Enviar métricas a sistema de monitoreo
-        # (ej: Prometheus, CloudWatch, etc.)
 
 
 # ==================== GESTOR DE OBSERVADORES ====================

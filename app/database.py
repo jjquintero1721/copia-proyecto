@@ -21,7 +21,7 @@ class DatabaseConnection:
     """
     _instance = None
     _engine = None
-    _SessionLocal = None
+    _session_local = None
 
     def __new__(cls):
         if cls._instance is None:
@@ -66,7 +66,7 @@ class DatabaseConnection:
         self._configure_postgresql_events()
 
         # Crear SessionLocal para manejo de sesiones
-        self._SessionLocal = sessionmaker(
+        self._session_local = sessionmaker(
             autocommit=False,
             autoflush=False,
             bind=self._engine
@@ -99,7 +99,7 @@ class DatabaseConnection:
 
     def get_session(self):
         """Retorna una nueva sesión de base de datos"""
-        return self._SessionLocal()
+        return self._session_local()
 
     def close_connection(self):
         """Cierra todas las conexiones del pool"""

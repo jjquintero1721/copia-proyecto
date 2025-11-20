@@ -52,6 +52,8 @@ class NotificationService:
 
         logger.info("📧 NotificationService inicializado")
 
+    MSG_DATE_FORMAT = "%d/%m/%Y %H:%M"
+
     def send_appointment_confirmation(
         self,
         appointment_id: UUID,
@@ -160,7 +162,7 @@ class NotificationService:
                     settings = self._get_notification_settings(propietario.usuario_id)
                     if settings and not settings.should_send_reminder():
                         logger.info(
-                            f"ℹ️ Usuario tiene deshabilitados los recordatorios"
+                            "ℹ️ Usuario tiene deshabilitados los recordatorios"
                         )
                         return False
 
@@ -232,8 +234,8 @@ class NotificationService:
 
             # Obtener contexto
             context = self._build_appointment_context(appointment)
-            context["fecha_anterior"] = fecha_anterior.strftime("%d/%m/%Y %H:%M")
-            context["fecha_nueva"] = appointment.fecha_hora.strftime("%d/%m/%Y %H:%M")
+            context["fecha_anterior"] = fecha_anterior.strftime(self.MSG_DATE_FORMAT)
+            context["fecha_nueva"] = appointment.fecha_hora.strftime(self.MSG_DATE_FORMAT)
 
             # Obtener plantilla
             template = get_email_template("appointment_reschedule")

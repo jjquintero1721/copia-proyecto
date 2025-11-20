@@ -9,6 +9,7 @@ from uuid import UUID
 from datetime import datetime
 from enum import Enum
 
+MSQ_DATO= "^(Si|No)$"
 
 class TriagePriorityEnum(str, Enum):
     """Enumeración de prioridades para validación"""
@@ -46,8 +47,8 @@ class TriageCreate(BaseModel):
     fr: int = Field(..., gt=0, le=200, description="Frecuencia respiratoria (respiraciones/min)")
     temperatura: float = Field(..., gt=35.0, lt=42.0, description="Temperatura en °C")
     dolor: DolorEnum = Field(..., description="Nivel de dolor")
-    sangrado: str = Field(..., pattern="^(Si|No)$", description="Presencia de sangrado (Si/No)")
-    shock: str = Field(..., pattern="^(Si|No)$", description="Presencia de shock (Si/No)")
+    sangrado: str = Field(..., pattern=MSQ_DATO, description="Presencia de sangrado (Si/No)")
+    shock: str = Field(..., pattern=MSQ_DATO, description="Presencia de shock (Si/No)")
     observaciones: Optional[str] = Field(None, max_length=1000, description="Observaciones adicionales")
 
     @field_validator('temperatura')
@@ -86,8 +87,8 @@ class TriageUpdate(BaseModel):
     fr: Optional[int] = Field(None, gt=0, le=200)
     temperatura: Optional[float] = Field(None, gt=35.0, lt=42.0)
     dolor: Optional[DolorEnum] = None
-    sangrado: Optional[str] = Field(None, pattern="^(Si|No)$")
-    shock: Optional[str] = Field(None, pattern="^(Si|No)$")
+    sangrado: Optional[str] = Field(None, pattern=MSQ_DATO)
+    shock: Optional[str] = Field(None, pattern=MSQ_DATO)
     observaciones: Optional[str] = Field(None, max_length=1000)
 
 

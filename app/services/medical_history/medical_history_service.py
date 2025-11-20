@@ -313,7 +313,7 @@ class MedicalHistoryService:
         # Registrar uso de medicamentos
         if medicamentos_usados:
             inventory_facade = InventoryFacade(self.db)
-            movimientos = inventory_facade.registrar_uso_en_consulta(
+            inventory_facade.registrar_uso_en_consulta(
                 medicamentos_usados=medicamentos_usados,
                 consulta_id=consulta_id,
                 usuario_id=usuario_id
