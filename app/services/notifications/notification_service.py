@@ -361,11 +361,16 @@ class NotificationService:
             reminder_window_end = now + timedelta(hours=24, minutes=10)
 
             # Buscar citas en ventana de recordatorio
-            appointments = self.appointment_repo.get_appointments_in_date_range(
-                fecha_desde=reminder_window_start,
-                fecha_hasta=reminder_window_end,
-                estado=AppointmentStatus.CONFIRMADA
+            all_appointments = self.appointment_repo.get_by_date_range(
+                fecha_inicio=reminder_window_start,
+                fecha_fin=reminder_window_end
             )
+
+            # Filtrar solo las confirmadas
+            appointments = [
+                apt for apt in all_appointments
+                if apt.estado == AppointmentStatus.CONFIRMADA
+            ]
 
             logger.info(
                 f"🔍 Encontradas {len(appointments)} citas "
