@@ -35,6 +35,8 @@ class AppointmentDecorator(ABC):
     Principio Single Responsibility: Cada decorador añade una funcionalidad específica
     """
 
+    MSG_SESSION = "Sesión de BD requerida para persistir"
+
     def __init__(self, appointment: Appointment):
         """
         Inicializa el decorador con la cita a decorar
@@ -150,7 +152,7 @@ class RecordatorioDecorator(AppointmentDecorator):
             ValueError: Si db no está disponible
         """
         if not self.db:
-            raise ValueError("Sesión de BD requerida para persistir")
+            raise ValueError(self.MSG_SESSION)
 
         decorator_model = AppointmentDecoratorModel(
             cita_id=self._appointment.id,
@@ -243,7 +245,7 @@ class NotasEspecialesDecorator(AppointmentDecorator):
             ValueError: Si db no está disponible
         """
         if not self.db:
-            raise ValueError("Sesión de BD requerida para persistir")
+            raise ValueError(self.MSG_SESSION)
 
         decorator_model = AppointmentDecoratorModel(
             cita_id=self._appointment.id,
@@ -359,7 +361,7 @@ class PrioridadDecorator(AppointmentDecorator):
             ValueError: Si db no está disponible
         """
         if not self.db:
-            raise ValueError("Sesión de BD requerida para persistir")
+            raise ValueError(self.MSG_SESSION)
 
         decorator_model = AppointmentDecoratorModel(
             cita_id=self._appointment.id,

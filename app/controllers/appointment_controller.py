@@ -45,6 +45,7 @@ from app.schemas.appointment_decorator_schema import PrioridadCreate
 
 router = APIRouter()
 
+MSG_CITA_NO_ENCONTRADA = "Cita no encontrada"
 
 @router.post("/", response_model=dict, status_code=status.HTTP_201_CREATED)
 async def create_appointment(
@@ -416,7 +417,7 @@ async def add_recordatorio_decorator(
         if not appointment:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Cita no encontrada"
+                detail=MSG_CITA_NO_ENCONTRADA
             )
 
         # Crear y persistir decorador
@@ -460,7 +461,7 @@ async def add_notas_decorator(
         if not appointment:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Cita no encontrada"
+                detail=MSG_CITA_NO_ENCONTRADA
             )
 
         decorator = NotasEspecialesDecorator(
@@ -503,7 +504,7 @@ async def add_prioridad_decorator(
         if not appointment:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Cita no encontrada"
+                detail=MSG_CITA_NO_ENCONTRADA
             )
 
         decorator = PrioridadDecorator(
@@ -548,7 +549,7 @@ async def get_appointment_decorators(
         if not appointment:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Cita no encontrada"
+                detail=MSG_CITA_NO_ENCONTRADA
             )
 
         cita_completa = get_cita_con_decoradores(appointment, db)
