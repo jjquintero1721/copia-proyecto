@@ -5,7 +5,7 @@ RF-05: Gestión de citas (agendar, reprogramar, cancelar)
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from uuid import UUID
 from datetime import datetime, date
 
@@ -32,6 +32,15 @@ from app.commands.appointment_commands import (
     CancelAppointmentCommand,
     ConfirmAppointmentCommand
 )
+from app.services.decorators import (
+    RecordatorioDecorator,
+    NotasEspecialesDecorator,
+    PrioridadDecorator
+)
+from app.repositories.appointment_decorator_repository import (
+    AppointmentDecoratorRepository
+)
+from app.models.appointment_decorator import DecoratorType
 
 router = APIRouter()
 
@@ -383,4 +392,210 @@ async def get_veterinarian_availability(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error al obtener disponibilidad: {str(exc)}"
+        )
+
+
+@router.post("/{appointment_id}/decoradores/recordatorio", response_model=dict)
+async def add_recordatorio_decorator(
+        appointment_id: UUID,
+        recordatorios: List[Dict[str, Any]],
+        db: Session = Depends(get_db),
+        current_user: User = Depends(require_staff)
+):
+    """
+    Añade decorador de recordatorios a una cita
+
+    **Requiere**: Token JWT válido
+    **Acceso**: Staff
+    """
+    try:
+        appointment_service = AppointmentService(db)
+        appointment = appointment_service.get_appointment_by_id(appointment_id)
+
+        if not appointment:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Cita no encontrada"
+            )
+
+        # Crear y persistir decorador
+        decorator = RecordatorioDecorator(
+            appointment=appointment,
+            recordatorios=recordatorios,
+            db=db
+        )
+
+        decorator_model = decorator.persistir(creado_por=current_user.id)
+
+        return success_response(
+            data=decorator.get_detalles(),
+            message="Recordatorios añadidos exitosamente"
+        )
+
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc)
+        )
+
+
+@router.post("/{appointment_id}/decoradores/notas", response_model=dict)
+async def add_notas_decorator(
+        appointment_id: UUID,
+        notas: Dict[str, Any],
+        db: Session = Depends(get_db),
+        current_user: User = Depends(require_staff)
+):
+    """
+    Añade decorador de notas especiales a una cita
+
+    **Requiere**: Token JWT válido
+    **Acceso**: Staff
+    """
+    try:
+        appointment_service = AppointmentService(db)
+        appointment = appointment_service.get_appointment_by_id(appointment_id)
+
+        if not appointment:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Cita no encontrada"
+            )
+
+        decorator = NotasEspecialesDecorator(
+            appointment=appointment,
+            notas=notas,
+            db=db
+        )
+
+        decorator_model = decorator.persistir(creado_por=current_user.id)
+
+        return success_response(
+            data=decorator.get_detalles(),
+            message="Notas especiales añadidas exitosamente"
+        )
+
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc)
+        )
+
+
+@router.post("/{appointment_id}/decoradores/prioridad", response_model=dict)
+async def add_prioridad_decorator(
+        appointment_id: UUID,
+        nivel_prioridad: str,
+        razon: str,
+        db: Session = Depends(get_db),
+        current_user: User = Depends(require_staff)
+):
+    """
+    Añade decorador de prioridad a una cita
+
+    **Requiere**: Token JWT válido
+    **Acceso**: Staff
+    """
+    try:
+        appointment_service = AppointmentService(db)
+        appointment = appointment_service.get_appointment_by_id(appointment_id)
+
+        if not appointment:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Cita no encontrada"
+            )
+
+        decorator = PrioridadDecorator(
+            appointment=appointment,
+            nivel_prioridad=nivel_prioridad,
+            razon=razon,
+            db=db
+        )
+
+        decorator_model = decorator.persistir(creado_por=current_user.id)
+
+        return success_response(
+            data=decorator.get_detalles(),
+            message=f"Prioridad {nivel_prioridad} asignada exitosamente"
+        )
+
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc)
+        )
+
+
+@router.get("/{appointment_id}/decoradores", response_model=dict)
+async def get_appointment_decorators(
+        appointment_id: UUID,
+        db: Session = Depends(get_db),
+        current_user: User = Depends(require_staff)
+):
+    """
+    Obtiene todos los decoradores de una cita
+
+    **Requiere**: Token JWT válido
+    **Acceso**: Staff
+    """
+    try:
+        from app.services.decorators import get_cita_con_decoradores
+
+        appointment_service = AppointmentService(db)
+        appointment = appointment_service.get_appointment_by_id(appointment_id)
+
+        if not appointment:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Cita no encontrada"
+            )
+
+        cita_completa = get_cita_con_decoradores(appointment, db)
+
+        return success_response(
+            data=cita_completa,
+            message="Decoradores obtenidos exitosamente"
+        )
+
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc)
+        )
+
+
+@router.delete("/{appointment_id}/decoradores/{decorator_id}", response_model=dict)
+async def remove_decorator(
+        appointment_id: UUID,
+        decorator_id: UUID,
+        db: Session = Depends(get_db),
+        current_user: User = Depends(require_staff)
+):
+    """
+    Elimina un decorador de una cita
+
+    **Requiere**: Token JWT válido
+    **Acceso**: Staff
+    """
+    try:
+        decorator_repo = AppointmentDecoratorRepository(db)
+
+        success = decorator_repo.delete(decorator_id)
+
+        if not success:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Decorador no encontrado"
+            )
+
+        return success_response(
+            data={"decorator_id": str(decorator_id)},
+            message="Decorador eliminado exitosamente"
+        )
+
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error al eliminar decorador: {str(exc)}"
         )

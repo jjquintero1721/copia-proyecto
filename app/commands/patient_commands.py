@@ -5,7 +5,7 @@ from datetime import date
 
 from app.services.owner_service import CreateOwnerService
 from app.services.pet_service import CreatePetService
-from app.services.decorators import AuditDecorator
+from app.services.decorators.service_decorators import AuditDecorator
 
 
 # ==================== COMANDO: CREACIÓN DE MASCOTA ====================
