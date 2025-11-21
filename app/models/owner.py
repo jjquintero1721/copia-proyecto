@@ -40,6 +40,13 @@ class Owner(Base):
         unique=True,  # Relación 1:1
         index=True
     )
+    # Relaciones
+    mascotas = relationship(
+        "Pet",
+        back_populates="owner",
+        cascade="all, delete-orphan",
+        lazy="select"
+    )
 
     # Nombre completo del propietario
     nombre = Column(String(120), nullable=False)

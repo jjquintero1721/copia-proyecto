@@ -2,7 +2,7 @@
 Schemas de Mascota - Validación con Pydantic
 """
 from pydantic import BaseModel, Field
-from typing import Optional
+from typing import Optional, List
 from uuid import UUID
 from datetime import date, datetime
 
@@ -20,6 +20,18 @@ class PetCreate(BaseModel):
     microchip: Optional[str] = Field(None, max_length=60)  # Código del microchip (opcional)
     fecha_nacimiento: Optional[date] = None  # Fecha de nacimiento (opcional)
 
+
+class OwnerSimple(BaseModel):
+    """
+    Esquema simplificado de propietario para respuestas anidadas
+    """
+    id: UUID
+    nombre: str
+    correo: str
+    telefono: Optional[str]
+
+    class Config:
+        from_attributes = True
 
 # ==================== SCHEMA DE SALIDA: RESPUESTA MASCOTA ====================
 class PetResponse(BaseModel):
@@ -40,3 +52,90 @@ class PetResponse(BaseModel):
     class Config:
         # Permite crear instancias del modelo a partir de objetos ORM (como los modelos de SQLAlchemy)
         from_attributes = True
+
+
+class PetWithOwnerResponse(BaseModel):
+    """
+    Esquema de respuesta de mascota con información del propietario
+    Usado en listados para mostrar relación mascota-propietario
+    """
+    id: UUID
+    nombre: str
+    especie: str
+    raza: Optional[str]
+    microchip: Optional[str]
+    fecha_nacimiento: Optional[date]
+    activo: bool
+    fecha_creacion: datetime
+    owner: OwnerSimple
+
+    class Config:
+        from_attributes = True
+
+
+# ==================== SCHEMA DE SALIDA: LISTA PAGINADA DE MASCOTAS ====================
+class PetListResponse(BaseModel):
+    """
+    Esquema de respuesta para listas paginadas de mascotas
+    Incluye datos de paginación y metadatos
+    """
+    total: int = Field(..., description="Total de mascotas en el sistema")
+    page: int = Field(..., description="Página actual")
+    page_size: int = Field(..., description="Tamaño de la página")
+    total_pages: int = Field(..., description="Total de páginas disponibles")
+    pets: List[PetWithOwnerResponse] = Field(..., description="Lista de mascotas")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "total": 50,
+                "page": 1,
+                "page_size": 10,
+                "total_pages": 5,
+                "pets": [
+                    {
+                        "id": "123e4567-e89b-12d3-a456-426614174000",
+                        "nombre": "Max",
+                        "especie": "perro",
+                        "raza": "Golden Retriever",
+                        "microchip": "123456789012345",
+                        "fecha_nacimiento": "2020-05-15",
+                        "activo": True,
+                        "fecha_creacion": "2024-01-15T10:30:00",
+                        "propietario": {
+                            "id": "123e4567-e89b-12d3-a456-426614174001",
+                            "nombre": "Juan Pérez",
+                            "correo": "juan@example.com",
+                            "telefono": "+573001234567"
+                        }
+                    }
+                ]
+            }
+        }
+
+
+# ==================== SCHEMA PARA QUERY PARAMETERS ====================
+class PetQueryParams(BaseModel):
+    """
+    Esquema para validar parámetros de consulta en endpoints
+    """
+    page: int = Field(1, ge=1, description="Número de página (mínimo 1)")
+    page_size: int = Field(
+        10,
+        ge=1,
+        le=100,
+        description="Tamaño de página (entre 1 y 100)"
+    )
+    activo: Optional[bool] = Field(
+        True,
+        description="Filtrar por estado activo (None = todos)"
+    )
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "page": 1,
+                "page_size": 10,
+                "activo": True
+            }
+        }

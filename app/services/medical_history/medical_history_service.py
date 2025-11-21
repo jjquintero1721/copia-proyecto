@@ -19,7 +19,7 @@ from app.repositories.medical_history_repository import MedicalHistoryRepository
 from app.schemas.consultation_schema import ConsultationCreate, ConsultationUpdate
 from app.services.medical_history.consultation_builder import ConsultationBuilder
 from app.services.inventory.inventory_facade import InventoryFacade
-
+from app.services.medical_history.historia_clinica_builder import HistoriaClinicaBuilder
 
 class MedicalHistoryService:
     """

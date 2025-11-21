@@ -74,7 +74,7 @@ class Pet(Base):
     )
 
     # Relación con el modelo Owner: permite acceder a los datos del propietario desde la mascota
-    owner = relationship("Owner", backref="mascotas")
+    owner = relationship("Owner", back_populates="mascotas")
 
     triages = relationship("Triage", back_populates="mascota", cascade="all, delete-orphan")
 

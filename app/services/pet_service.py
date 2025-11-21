@@ -18,6 +18,7 @@ from app.models.pet import Pet
 from app.models.medical_history import MedicalHistory
 from app.utils.medical_history_number_generator import MedicalHistoryNumberGenerator
 from app.models.owner import Owner
+from app.services.medical_history.historia_clinica_builder import HistoriaClinicaBuilder
 
 class CreatePetService(CreateTemplate):
     """
@@ -102,15 +103,18 @@ class CreatePetService(CreateTemplate):
 
         RF-04: Creación automática de historia clínica
         Formato del número: HC-YYYY-XXXX
+
+        Usa Builder Pattern para construcción estructurada
         """
         # Generar número único para la historia clínica
         numero_historia = MedicalHistoryNumberGenerator.generate(self.db)
 
-        # Crear historia clínica con número generado
-        mh = MedicalHistory(
-            mascota_id=entity.id,
-            numero=numero_historia
-        )
+        # Crear historia clínica usando Builder Pattern
+        builder = HistoriaClinicaBuilder()
+        mh = (builder
+              .set_mascota_id(entity.id)
+              .set_numero(numero_historia)
+              .build())
 
         self.db.add(mh)
         self.db.commit()

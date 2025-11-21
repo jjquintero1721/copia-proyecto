@@ -1,37 +1,33 @@
 """
-Schemas de Propietario - Validación con Pydantic
-CORRECCIÓN ARQUITECTURAL: Incluye usuario_id en las respuestas
+Schemas de Propietario - Con respuestas de lista y paginación
+Validación con Pydantic para endpoints de consulta
 """
 
-from pydantic import BaseModel, EmailStr, Field
-from typing import Optional
+from pydantic import BaseModel, Field, EmailStr
+from typing import Optional, List
 from uuid import UUID
 from datetime import datetime
 
 
-# ==================== SCHEMA DE ENTRADA: CREAR PROPIETARIO ====================
-class OwnerCreate(BaseModel):
+# ==================== SCHEMA DE MASCOTA SIMPLIFICADO ====================
+class PetSimple(BaseModel):
     """
-    Esquema de validación para la creación de un propietario.
-
-
-    Los propietarios se crean automáticamente al registrar un usuario
-    con rol PROPIETARIO mediante POST /auth/register.
-
-    Se mantiene por compatibilidad con código existente.
+    Esquema simplificado de mascota para respuestas anidadas
     """
-    nombre: str = Field(..., min_length=3, max_length=120)
-    correo: EmailStr
-    documento: str = Field(..., min_length=3, max_length=50)
-    telefono: Optional[str] = Field(None, max_length=20)
+    id: UUID
+    nombre: str
+    especie: str
+    raza: Optional[str]
+    activo: bool
+
+    class Config:
+        from_attributes = True
 
 
 # ==================== SCHEMA DE SALIDA: RESPUESTA PROPIETARIO ====================
 class OwnerResponse(BaseModel):
     """
-    Esquema de respuesta que representa los datos de un propietario.
-
-    Incluye usuario_id para mostrar la relación
+    Esquema de respuesta que representa los datos de un propietario
     """
     id: UUID
     usuario_id: UUID
@@ -41,21 +37,73 @@ class OwnerResponse(BaseModel):
     telefono: Optional[str]
     activo: bool
     fecha_creacion: datetime
+    fecha_actualizacion: Optional[datetime]
 
     class Config:
         from_attributes = True
 
 
-# ==================== SCHEMA DE ACTUALIZACIÓN ====================
-class OwnerUpdate(BaseModel):
+# ==================== SCHEMA DE SALIDA: PROPIETARIO CON MASCOTAS ====================
+class OwnerWithPetsResponse(BaseModel):
     """
-    Esquema para actualizar datos de un propietario existente.
-    Todos los campos son opcionales.
+    Esquema de respuesta de propietario con sus mascotas
+    Usado en consultas detalladas
     """
-    nombre: Optional[str] = Field(None, min_length=3, max_length=120)
-    telefono: Optional[str] = Field(None, max_length=20)
-    documento: Optional[str] = Field(None, min_length=3, max_length=50)
-    activo: Optional[bool] = None
+    id: UUID
+    usuario_id: Optional[UUID] = None
+    nombre: str
+    correo: EmailStr
+    documento: str
+    telefono: Optional[str]
+    activo: bool
+    fecha_creacion: datetime
+    fecha_actualizacion: Optional[datetime]
+    mascotas: List[PetSimple] = Field(default_factory=list)
 
     class Config:
         from_attributes = True
+
+
+# ==================== SCHEMA DE SALIDA: LISTA PAGINADA DE PROPIETARIOS ====================
+class OwnerListResponse(BaseModel):
+    """
+    Esquema de respuesta para listas paginadas de propietarios
+    Incluye datos de paginación y metadatos
+    """
+    total: int = Field(..., description="Total de propietarios en el sistema")
+    page: int = Field(..., description="Página actual")
+    page_size: int = Field(..., description="Tamaño de la página")
+    total_pages: int = Field(..., description="Total de páginas disponibles")
+    owners: List[OwnerWithPetsResponse] = Field(..., description="Lista de propietarios")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "total": 25,
+                "page": 1,
+                "page_size": 10,
+                "total_pages": 3,
+                "owners": [
+                    {
+                        "id": "123e4567-e89b-12d3-a456-426614174001",
+                        "usuario_id": "123e4567-e89b-12d3-a456-426614174002",
+                        "nombre": "Juan Pérez",
+                        "correo": "juan@example.com",
+                        "documento": "1234567890",
+                        "telefono": "+573001234567",
+                        "activo": True,
+                        "fecha_creacion": "2024-01-15T10:30:00",
+                        "fecha_actualizacion": None,
+                        "mascotas": [
+                            {
+                                "id": "123e4567-e89b-12d3-a456-426614174000",
+                                "nombre": "Max",
+                                "especie": "perro",
+                                "raza": "Golden Retriever",
+                                "activo": True
+                            }
+                        ]
+                    }
+                ]
+            }
+        }

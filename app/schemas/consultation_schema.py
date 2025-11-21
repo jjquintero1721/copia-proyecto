@@ -6,7 +6,7 @@ RF-07: Gestión de historias clínicas
 from pydantic import BaseModel, Field, field_validator
 from typing import Optional
 from uuid import UUID
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 class ConsultationBase(BaseModel):
