@@ -10,7 +10,7 @@ from datetime import datetime
 
 from app.services.appointment.appointment_service import AppointmentService
 from app.services.appointment.appointment_facade import AppointmentFacade
-from app.services.decorators.service_decorators import AuditDecorator
+from app.services.decorators import AuditDecorator
 from app.schemas.appointment_schema import AppointmentCreate
 
 

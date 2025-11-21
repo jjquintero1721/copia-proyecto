@@ -18,14 +18,7 @@ Exports:
 
 Relaciona con: RF-05, RF-06, RNF-07
 """
-
-from app.services.decorators.service_decorators import (
-    ServiceDecorator,
-    LoggingDecorator,
-    AuditDecorator,
-    ValidationDecorator,
-    create_decorated_service
-)
+from app.services.decorators.decorators import AuditDecorator
 
 from app.services.decorators.appointment_decorators import (
     AppointmentDecorator,
@@ -37,13 +30,8 @@ from app.services.decorators.appointment_decorators import (
 )
 
 __all__ = [
-    # Decoradores de servicios
-    'ServiceDecorator',
-    'LoggingDecorator',
-    'AuditDecorator',
-    'ValidationDecorator',
-    'create_decorated_service',
 
+    'AuditDecorator',
     # Decoradores de citas
     'AppointmentDecorator',
     'RecordatorioDecorator',

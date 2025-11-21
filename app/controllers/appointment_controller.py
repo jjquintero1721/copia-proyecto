@@ -41,6 +41,7 @@ from app.repositories.appointment_decorator_repository import (
     AppointmentDecoratorRepository
 )
 from app.models.appointment_decorator import DecoratorType
+from app.schemas.appointment_decorator_schema import PrioridadCreate
 
 router = APIRouter()
 
@@ -485,8 +486,7 @@ async def add_notas_decorator(
 @router.post("/{appointment_id}/decoradores/prioridad", response_model=dict)
 async def add_prioridad_decorator(
         appointment_id: UUID,
-        nivel_prioridad: str,
-        razon: str,
+        data: PrioridadCreate,
         db: Session = Depends(get_db),
         current_user: User = Depends(require_staff)
 ):
@@ -508,8 +508,8 @@ async def add_prioridad_decorator(
 
         decorator = PrioridadDecorator(
             appointment=appointment,
-            nivel_prioridad=nivel_prioridad,
-            razon=razon,
+            nivel_prioridad=data.nivel_prioridad,
+            razon=data.razon,
             db=db
         )
 
@@ -517,7 +517,7 @@ async def add_prioridad_decorator(
 
         return success_response(
             data=decorator.get_detalles(),
-            message=f"Prioridad {nivel_prioridad} asignada exitosamente"
+            message=f"Prioridad {data.nivel_prioridad} asignada exitosamente"
         )
 
     except ValueError as exc:

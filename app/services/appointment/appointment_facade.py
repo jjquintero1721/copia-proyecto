@@ -8,9 +8,7 @@ from typing import Dict, Any, Optional
 from uuid import UUID
 from datetime import datetime
 
-from app.models import User
 from app.services.appointment.appointment_service import AppointmentService
-from app.services.decorators import create_decorated_service
 from app.services.service_service import ServiceService
 from app.repositories.pet_repository import PetRepository
 from app.repositories.user_repository import UserRepository
@@ -23,18 +21,9 @@ class AppointmentFacade:
     Orquesta operaciones complejas que involucran múltiples servicios
     """
 
-    def __init__(self, db: Session, current_user: Optional[User] = None):
+    def __init__(self, db: Session):
         self.db = db
-        if current_user:
-            self.appointment_service = create_decorated_service(
-                AppointmentService(db),
-                db=db,
-                usuario_id=current_user.id,
-                enable_logging=True,
-                enable_audit=True
-            )
-        else:
-            self.appointment_service = AppointmentService(db)
+        self.appointment_service = AppointmentService(db)
         self.service_service = ServiceService(db)
         self.pet_repo = PetRepository(db)
         self.user_repo = UserRepository(db)

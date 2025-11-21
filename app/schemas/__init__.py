@@ -24,6 +24,7 @@ from app.schemas.notification_settings_schema import (
     EmailTestRequest,
     EmailTestResponse
 )
+from app.schemas.appointment_decorator_schema import PrioridadCreate
 
 __all__ = [
     'NotificationSettingsCreate',
@@ -31,5 +32,16 @@ __all__ = [
     'NotificationSettingsResponse',
     'EmailProviderInfoResponse',
     'EmailTestRequest',
-    'EmailTestResponse'
+    'EmailTestResponse',
+    'TriageCreate',
+    'TriageUpdate',
+    'TriageResponse',
+    'TriagePriorityEnum',
+    'TriageGeneralStateEnum',
+    'DolorEnum',
+    'FollowUpCreate',
+    'FollowUpResponse',
+    'FollowUpListResponse',
+    'FollowUpCompletionCreate',
+    'PrioridadCreate'
 ]
