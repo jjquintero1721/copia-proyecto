@@ -96,6 +96,7 @@ async def list_appointments(
         veterinario_id: Optional[UUID] = None,
         fecha_desde: Optional[datetime] = None,
         fecha_hasta: Optional[datetime] = None,
+        include_relations: bool = Query(True, description="Incluir información de relaciones"),
         db: Session = Depends(get_db),
         current_user: User = Depends(get_current_active_user)
 ):
@@ -120,6 +121,11 @@ async def list_appointments(
             fecha_desde=fecha_desde,
             fecha_hasta=fecha_hasta
         )
+
+        if include_relations:
+            citas_serialized = [a.to_dict_with_relations() for a in appointments]
+        else:
+            citas_serialized = [a.to_dict() for a in appointments]
 
         return success_response(
             data={

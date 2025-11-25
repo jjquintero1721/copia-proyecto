@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from uuid import UUID
+from fastapi import Body
 
 from app.database import get_db
 from app.services.user_service import UserService
@@ -256,7 +257,7 @@ async def update_user(
 @router.post("/{user_id}/change-password", response_model=dict)
 async def change_password(
         user_id: UUID,
-        password_data: UserChangePassword,
+        password_data: UserChangePassword = Body(...),
         db: Session = Depends(get_db),
         current_user: User = Depends(get_current_active_user)
 ):

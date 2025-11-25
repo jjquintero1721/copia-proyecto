@@ -3,7 +3,7 @@ Repositorio de Citas - Capa de acceso a datos
 RF-05: Gestión de citas
 """
 
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import and_, or_
 from typing import Optional, List, Any
 from uuid import UUID
@@ -39,10 +39,18 @@ class AppointmentRepository:
         mascota_id: Optional[UUID] = None,
         veterinario_id: Optional[UUID] = None,
         fecha_desde: Optional[datetime] = None,
-        fecha_hasta: Optional[datetime] = None
-    ) -> List[Appointment]:
+        fecha_hasta: Optional[datetime] = None,
+        load_relations: bool = False
+    ) -> list[type[Appointment]]:
         """Obtiene todas las citas con filtros opcionales"""
         query = self.db.query(Appointment)
+
+        if load_relations:
+            query = query.options(
+                joinedload(Appointment.mascota),
+                joinedload(Appointment.veterinario),
+                joinedload(Appointment.servicio)
+            )
 
         if estado:
             query = query.filter(Appointment.estado == estado)

@@ -122,3 +122,49 @@ class Appointment(Base):
             "notas": self.notas,
             "fecha_creacion": fecha_creacion_aware.isoformat() if fecha_creacion_aware else None
         }
+
+    def to_dict_with_relations(self):
+        """
+        Convierte el appointment a diccionario incluyendo información de relaciones
+        Útil para endpoints que necesitan mostrar información completa
+        """
+        base_dict = {
+            'id': str(self.id),
+            'mascota_id': str(self.mascota_id),
+            'veterinario_id': str(self.veterinario_id),
+            'servicio_id': str(self.servicio_id),
+            'fecha_hora': self.fecha_hora.isoformat(),
+            'motivo': self.motivo,
+            'estado': self.estado.value,
+            'cancelacion_tardia': self.cancelacion_tardia,
+            'notas': self.notas,
+            'creado_por': str(self.creado_por) if self.creado_por else None,
+            'fecha_creacion': self.fecha_creacion.isoformat(),
+            'fecha_actualizacion': self.fecha_actualizacion.isoformat()
+        }
+
+        # Agregar información de mascota si está cargada
+        if self.mascota:
+            base_dict['mascota'] = {
+                'id': str(self.mascota.id),
+                'nombre': self.mascota.nombre,
+                'especie': self.mascota.especie
+            }
+
+        # Agregar información de veterinario si está cargado
+        if self.veterinario:
+            base_dict['veterinario'] = {
+                'id': str(self.veterinario.id),
+                'nombre': self.veterinario.nombre
+            }
+
+        # Agregar información de servicio si está cargado
+        if self.servicio:
+            base_dict['servicio'] = {
+                'id': str(self.servicio.id),
+                'nombre': self.servicio.nombre,
+                'duracion_minutos': self.servicio.duracion_minutos,
+                'costo': float(self.servicio.costo) if self.servicio.costo else None
+            }
+
+        return base_dict
