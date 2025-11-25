@@ -97,7 +97,8 @@ class AppointmentService:
             mascota_id: Optional[UUID] = None,
             veterinario_id: Optional[UUID] = None,
             fecha_desde: Optional[datetime] = None,
-            fecha_hasta: Optional[datetime] = None
+            fecha_hasta: Optional[datetime] = None,
+            load_relations: bool = False
     ) -> List[Appointment]:
 
         return self.repository.get_all(
@@ -107,7 +108,8 @@ class AppointmentService:
             mascota_id=mascota_id,
             veterinario_id=veterinario_id,
             fecha_desde=fecha_desde,
-            fecha_hasta=fecha_hasta
+            fecha_hasta=fecha_hasta,
+            load_relations=load_relations
         )
 
     def get_appointments_by_date(

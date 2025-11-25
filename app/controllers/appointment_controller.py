@@ -119,7 +119,8 @@ async def list_appointments(
             mascota_id=mascota_id,
             veterinario_id=veterinario_id,
             fecha_desde=fecha_desde,
-            fecha_hasta=fecha_hasta
+            fecha_hasta=fecha_hasta,
+            load_relations=include_relations
         )
 
         if include_relations:
@@ -130,7 +131,7 @@ async def list_appointments(
         return success_response(
             data={
                 "total": len(appointments),
-                "citas": [a.to_dict() for a in appointments]
+                "citas": citas_serialized,
             },
             message="Lista de citas"
         )
