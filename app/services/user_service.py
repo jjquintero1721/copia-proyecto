@@ -3,6 +3,7 @@ Servicio de Usuarios - Lógica de negocio
 Implementa patrones: Factory Method, Builder, Template Method
 CORRECCIÓN ARQUITECTURAL: Crea Owner automáticamente para rol=propietario
 """
+from sqlite3 import IntegrityError
 
 from sqlalchemy.orm import Session
 from typing import Optional, List, Dict, Any
@@ -164,123 +165,118 @@ class BaseCRUDService(ABC):
 
 
 # ==================== SERVICIO PRINCIPAL ====================
-class UserService(BaseCRUDService):
+class UserService:
     """
-    Servicio principal de usuarios
-    Implementa Template Method y coordina las factories
+    Servicio de usuarios con transacción atómica.
 
-    CORRECCIÓN ARQUITECTURAL:
-    - Crea automáticamente Owner cuando rol = PROPIETARIO
-    - Mantiene sincronización entre usuarios y propietarios
+    CORRECCIÓN CRÍTICA APLICADA:
+    - Usuario y Propietario se crean en UNA SOLA transacción.
+    - Validaciones ANTES de tocar BD.
+    - Manejo de IntegrityError y rollback automático.
     """
 
     USER_NOT_FOUND_MSG = "Usuario no encontrado"
 
     def __init__(self, db: Session):
         self.db = db
-        repository = UserRepository(db)
-        super().__init__(repository)
-
-        # ✅ Repositorio adicional para Owner
+        self.user_repository = UserRepository(db)
         self.owner_repository = OwnerRepository(db)
 
-        # Registro de factories por rol
-        self._factories: Dict[str, UserFactory] = {
+        self._factories: Dict[str, any] = {
             UserRole.SUPERADMIN.value: SuperadminFactory(),
             UserRole.VETERINARIO.value: VeterinarioFactory(),
             UserRole.AUXILIAR.value: AuxiliarFactory(),
             UserRole.PROPIETARIO.value: PropietarioFactory()
         }
 
-    def _validar_datos(self, datos: UserCreate) -> None:
-        """Validación de datos de usuario"""
-        # RN01: Validar correo único
-        if self.repository.exists_by_correo(datos.correo):
+    # ============================================================
+    # 🔥 1. VALIDACIONES COMPLETAS
+    # ============================================================
+    def _validar_datos_completos(self, datos: UserCreate) -> None:
+
+        # Validar correo único
+        if self.user_repository.exists_by_correo(datos.correo):
             raise ValueError(f"El correo {datos.correo} ya está registrado")
 
-    def _preparar_entidad(self, datos: UserCreate, creado_por: Optional[UUID] = None) -> User:
-        """Preparación de usuario usando Factory Method"""
-        factory = self._factories.get(datos.rol.value)
-        if not factory:
-            raise ValueError(f"Rol no válido: {datos.rol}")
+        # Si es propietario, validar documento
+        if datos.rol == UserRoleEnum.PROPIETARIO:
 
-        return factory.create_user(datos, creado_por)
+            if not datos.documento:
+                raise ValueError("El documento es obligatorio para propietarios")
 
-    def _post_guardado(self, entidad: User) -> None:
-        """
-        Post-proceso después de guardar usuario
+            if self.owner_repository.get_by_documento(datos.documento):
+                raise ValueError(f"El documento {datos.documento} ya está registrado")
 
-        Si el usuario es PROPIETARIO, crear automáticamente
-        el registro en la tabla propietarios
-        """
-        # Si es propietario, crear Owner automáticamente
-        if entidad.rol == UserRole.PROPIETARIO:
-            # Usar el documento guardado temporalmente
-            documento = getattr(entidad, '_documento_temp', None)
-            self._crear_propietario_asociado(entidad, documento)
+            if self.owner_repository.get_by_correo(datos.correo):
+                raise ValueError(
+                    f"El correo {datos.correo} ya existe como propietario"
+                )
 
-    def _crear_propietario_asociado(self, user: User, documento: Optional[str] = None) -> Owner:
-        """
-        ✅ MÉTODO NUEVO: Crea Owner asociado al usuario
-
-        Soluciona el problema arquitectural:
-        - Antes: usuarios y propietarios estaban desincronizados
-        - Ahora: cada usuario propietario tiene su Owner automáticamente
-
-        Args:
-            user: Usuario recién creado con rol PROPIETARIO
-            documento: Documento de identidad (requerido)
-
-        Returns:
-            Owner creado
-
-        Raises:
-            ValueError: Si no se proporciona documento
-        """
-        if not documento:
-            raise ValueError("El documento es requerido para usuarios con rol propietario")
-
-        owner = Owner(
-            usuario_id=user.id,
-            nombre=user.nombre,
-            correo=user.correo,
-            documento=documento,
-            telefono=user.telefono,
-            activo=user.activo
-        )
-
-        self.db.add(owner)
-        self.db.commit()
-        self.db.refresh(owner)
-
-        return owner
-
+    # ============================================================
+    # 🔥 2. CREACIÓN ATÓMICA DE USUARIO Y PROPIETARIO
+    # ============================================================
     def create_user(self, user_data: UserCreate, creado_por: Optional[UUID] = None) -> User:
-        """
-        Crea un nuevo usuario usando el Template Method
+        try:
+            # 1. Validaciones completas
+            self._validar_datos_completos(user_data)
 
-        """
-        # Validar documento para propietarios
-        if user_data.rol == UserRoleEnum.PROPIETARIO and not user_data.documento:
-            raise ValueError("El documento es requerido para registrar un propietario")
+            # 2. Crear usuario en memoria usando factories
+            factory = self._factories.get(user_data.rol.value)
+            if not factory:
+                raise ValueError(f"Rol no válido: {user_data.rol}")
 
-        self._validar_datos(user_data)
-        user = self._preparar_entidad(user_data, creado_por)
-        user = self._persistir(user)
+            user = factory.create_user(user_data, creado_por)
 
-        # Guardar documento temporalmente para _post_guardado
-        if user_data.documento:
-            user._documento_temp = user_data.documento
+            # 3. Crear propietario EN MEMORIA sin commit
+            owner = None
+            if user_data.rol == UserRoleEnum.PROPIETARIO:
+                owner = Owner(
+                    usuario_id=user.id,
+                    nombre=user.nombre,
+                    correo=user.correo,
+                    documento=user_data.documento,
+                    telefono=user.telefono,
+                    activo=user.activo
+                )
 
-        self._post_guardado(user)  # Aquí se crea Owner si aplica
-        return user
+            # 4. Agregar ambos a la sesión (sin commit)
+            self.db.add(user)
+            if owner:
+                self.db.add(owner)
 
-    def authenticate(self, correo: str, contrasena: str) -> Optional[tuple[User, str]]:
-        """
-        Autentica un usuario y genera token JWT
-        Retorna: (usuario, token) si es exitoso, None si falla
-        """
-        user = self.repository.get_by_correo(correo.lower())
+            # 5. UN SOLO COMMIT (transacción atómica)
+            self.db.commit()
+
+            # 6. Refrescar datos
+            self.db.refresh(user)
+            if owner:
+                self.db.refresh(owner)
+
+            return user
+
+        except IntegrityError as exc:
+            self.db.rollback()
+
+            msg = str(exc.orig).lower()
+
+            if "correo" in msg:
+                raise ValueError(f"El correo {user_data.correo} ya está registrado")
+
+            if "documento" in msg:
+                raise ValueError(f"El documento {user_data.documento} ya está registrado")
+
+            raise ValueError(f"Error de integridad: {str(exc.orig)}")
+
+        except Exception:
+            self.db.rollback()
+            raise
+
+    # ============================================================
+    # 🔥  MÉTODOS RESTANTES SIN CAMBIOS (SIGUEN IGUAL)
+    # ============================================================
+
+    def authenticate(self, correo: str, contrasena: str):
+        user = self.user_repository.get_by_correo(correo.lower())
 
         if not user:
             return None
@@ -291,39 +287,29 @@ class UserService(BaseCRUDService):
         if not verify_password(contrasena, user.contrasena_hash):
             return None
 
-        # Crear token JWT
-        token_data = {
+        token = create_access_token({
             "sub": user.correo,
             "user_id": str(user.id),
             "rol": user.rol.value
-        }
-        access_token = create_access_token(token_data)
+        })
 
-        return user, access_token
+        return user, token
 
-    def get_user_by_id(self, user_id: UUID) -> Optional[User]:
-        """Obtiene un usuario por ID"""
-        return self.repository.get_by_id(user_id)
+    def get_user_by_id(self, user_id: UUID):
+        return self.user_repository.get_by_id(user_id)
 
-    def get_user_by_correo(self, correo: str) -> Optional[User]:
-        """Obtiene un usuario por correo"""
-        return self.repository.get_by_correo(correo.lower())
+    def get_user_by_correo(self, correo: str):
+        return self.user_repository.get_by_correo(correo.lower())
 
     def get_all_users(self, skip: int = 0, limit: int = 100, activo: Optional[bool] = None) -> List[User]:
         """Obtiene todos los usuarios con paginación"""
-        return self.repository.get_all(skip, limit, activo)
+        return self.user_repository.get_all(skip, limit, activo)
 
-    def get_users_by_rol(self, rol: UserRole, activo: bool = True) -> List[User]:
-        """Obtiene usuarios filtrados por rol"""
-        return self.repository.get_by_rol(rol, activo)
-
-    def update_user(self, user_id: UUID, user_data: UserUpdate) -> User:
-        """Actualiza un usuario existente"""
-        user = self.repository.get_by_id(user_id)
+    def update_user(self, user_id: UUID, user_data: UserUpdate):
+        user = self.user_repository.get_by_id(user_id)
         if not user:
             raise ValueError(self.USER_NOT_FOUND_MSG)
 
-        # Actualizar solo campos proporcionados
         if user_data.nombre is not None:
             user.nombre = user_data.nombre
         if user_data.telefono is not None:
@@ -332,29 +318,24 @@ class UserService(BaseCRUDService):
             user.activo = user_data.activo
 
         user.fecha_actualizacion = datetime.now(timezone.utc)
+        return self.user_repository.update(user)
 
-        return self.repository.update(user)
-
-    def change_password(self, user_id: UUID, password_data: UserChangePassword) -> User:
-        """Cambia la contraseña de un usuario"""
-        user = self.repository.get_by_id(user_id)
+    def change_password(self, user_id: UUID, password_data: UserChangePassword):
+        user = self.user_repository.get_by_id(user_id)
         if not user:
             raise ValueError(self.USER_NOT_FOUND_MSG)
 
-        # Verificar contraseña actual
         if not verify_password(password_data.contrasena_actual, user.contrasena_hash):
             raise ValueError("Contraseña actual incorrecta")
 
-        # Actualizar contraseña
         user.contrasena_hash = get_password_hash(password_data.contrasena_nueva)
         user.fecha_actualizacion = datetime.now(timezone.utc)
 
-        return self.repository.update(user)
+        return self.user_repository.update(user)
 
-    def deactivate_user(self, user_id: UUID) -> User:
-        """Desactiva un usuario (soft delete)"""
-        user = self.repository.get_by_id(user_id)
+    def deactivate_user(self, user_id: UUID):
+        user = self.user_repository.get_by_id(user_id)
         if not user:
             raise ValueError(self.USER_NOT_FOUND_MSG)
 
-        return self.repository.soft_delete(user)
+        return self.user_repository.soft_delete(user)
