@@ -121,7 +121,7 @@ async def get_users_by_role(
         rol: str,
         activo: bool = Query(True, description="Filtrar solo usuarios activos"),
         db: Session = Depends(get_db),
-        current_user: User = Depends(require_staff)
+        current_user: User = Depends(get_current_active_user)
 ):
     """
     Obtiene usuarios por rol
@@ -136,6 +136,20 @@ async def get_users_by_role(
     - propietario
     """
     try:
+        # ✅ Validación de permisos mejorada
+        if current_user.rol.value == "propietario":
+            # Los propietarios SOLO pueden ver veterinarios activos
+            if rol != "veterinario":
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Los propietarios solo pueden consultar veterinarios disponibles"
+                )
+            # Forzar filtro de activos para propietarios
+            activo = True
+
+        # Staff puede ver cualquier rol
+        # (no necesita validación adicional)
+
         service = UserService(db)
         users = service.get_users_by_rol(rol, activo)
 
@@ -148,6 +162,9 @@ async def get_users_by_role(
             message=f"Usuarios con rol '{rol}'"
         )
 
+    except HTTPException:
+        # Re-lanzar excepciones HTTP (como 403)
+        raise
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

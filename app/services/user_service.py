@@ -305,6 +305,32 @@ class UserService:
         """Obtiene todos los usuarios con paginación"""
         return self.user_repository.get_all(skip, limit, activo)
 
+    def get_users_by_rol(self, rol: str, activo: bool = True) -> List[User]:
+        """
+        Obtiene usuarios filtrados por rol
+
+        Args:
+            rol: String del rol ('veterinario', 'auxiliar', 'propietario', 'superadmin')
+            activo: Si True, filtra solo usuarios activos (default: True)
+
+        Returns:
+            Lista de usuarios del rol especificado
+
+        Raises:
+            ValueError: Si el rol no es válido
+        """
+        # Convertir string a UserRole enum
+        try:
+            user_role = UserRole(rol)
+        except ValueError:
+            valid_roles = [r.value for r in UserRole]
+            raise ValueError(
+                f"Rol '{rol}' no válido. Roles válidos: {', '.join(valid_roles)}"
+            )
+
+        # Usar el repositorio para obtener usuarios
+        return self.user_repository.get_by_rol(user_role, activo)
+
     def update_user(self, user_id: UUID, user_data: UserUpdate):
         user = self.user_repository.get_by_id(user_id)
         if not user:
