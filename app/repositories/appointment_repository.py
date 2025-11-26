@@ -29,8 +29,16 @@ class AppointmentRepository:
 
     def get_by_id(self, appointment_id: UUID) -> Optional[Appointment]:
         """Obtiene una cita por ID"""
-        return self.db.query(Appointment).filter(Appointment.id == appointment_id).first()
-
+        return (
+            self.db.query(Appointment)
+            .options(
+                joinedload(Appointment.mascota),
+                joinedload(Appointment.veterinario),
+                joinedload(Appointment.servicio)
+            )
+            .filter(Appointment.id == appointment_id)
+            .first()
+        )
     def get_all(
         self,
         skip: int = 0,
@@ -43,14 +51,14 @@ class AppointmentRepository:
         load_relations: bool = False
     ) -> list[type[Appointment]]:
         """Obtiene todas las citas con filtros opcionales"""
-        query = self.db.query(Appointment)
-
-        if load_relations:
-            query = query.options(
+        query = (
+            self.db.query(Appointment)
+            .options(
                 joinedload(Appointment.mascota),
                 joinedload(Appointment.veterinario),
                 joinedload(Appointment.servicio)
             )
+        )
 
         if estado:
             query = query.filter(Appointment.estado == estado)
@@ -79,15 +87,18 @@ class AppointmentRepository:
         Obtiene citas en un rango de fechas
         Útil para validar disponibilidad de horarios
         """
-        query = self.db.query(Appointment).filter(
-            and_(
-                Appointment.fecha_hora >= fecha_inicio,
-                Appointment.fecha_hora <= fecha_fin,
-                Appointment.estado.in_([
-                    AppointmentStatus.AGENDADA,
-                    AppointmentStatus.CONFIRMADA,
-                    AppointmentStatus.EN_PROCESO
-                ])
+        query = (
+            self.db.query(Appointment)
+            .options(
+                joinedload(Appointment.mascota),
+                joinedload(Appointment.veterinario),
+                joinedload(Appointment.servicio)
+            )
+            .filter(
+                and_(
+                    Appointment.fecha_hora >= fecha_inicio,
+                    Appointment.fecha_hora < fecha_fin
+                )
             )
         )
 

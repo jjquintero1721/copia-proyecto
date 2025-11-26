@@ -128,7 +128,7 @@ class Appointment(Base):
         Convierte el appointment a diccionario incluyendo información de relaciones
         Útil para endpoints que necesitan mostrar información completa
         """
-        base_dict = {
+        result = {
             'id': str(self.id),
             'mascota_id': str(self.mascota_id),
             'veterinario_id': str(self.veterinario_id),
@@ -145,26 +145,55 @@ class Appointment(Base):
 
         # Agregar información de mascota si está cargada
         if self.mascota:
-            base_dict['mascota'] = {
-                'id': str(self.mascota.id),
-                'nombre': self.mascota.nombre,
-                'especie': self.mascota.especie
+            result["mascota"] = {
+                "id": str(self.mascota.id),
+                "nombre": self.mascota.nombre,
+                "especie": self.mascota.especie,
+                "raza": self.mascota.raza if hasattr(self.mascota, 'raza') else None
             }
 
-        # Agregar información de veterinario si está cargado
+        else:
+            # Si la mascota no está cargada, al menos incluir valores por defecto
+            result["mascota"] = {
+                "id": str(self.mascota_id),
+                "nombre": "Mascota",  # Valor por defecto
+                "especie": None,
+                "raza": None
+            }
+
+            # ✅ CORRECCIÓN: Incluir información del veterinario si está cargado
         if self.veterinario:
-            base_dict['veterinario'] = {
-                'id': str(self.veterinario.id),
-                'nombre': self.veterinario.nombre
+            result["veterinario"] = {
+                "id": str(self.veterinario.id),
+                "nombre": self.veterinario.nombre,
+                "correo": self.veterinario.correo if hasattr(self.veterinario, 'correo') else None
+            }
+        else:
+            # Si el veterinario no está cargado, al menos incluir valores por defecto
+            result["veterinario"] = {
+                "id": str(self.veterinario_id),
+                "nombre": "Dr(a). Sin asignar",  # Valor por defecto
+                "correo": None
             }
 
-        # Agregar información de servicio si está cargado
+            # ✅ CORRECCIÓN: Incluir información del servicio si está cargado
         if self.servicio:
-            base_dict['servicio'] = {
-                'id': str(self.servicio.id),
-                'nombre': self.servicio.nombre,
-                'duracion_minutos': self.servicio.duracion_minutos,
-                'costo': float(self.servicio.costo) if self.servicio.costo else None
+            result["servicio"] = {
+                "id": str(self.servicio.id),
+                "nombre": self.servicio.nombre,
+                "duracion_minutos": self.servicio.duracion_minutos if hasattr(self.servicio,
+                                                                              'duracion_minutos') else None,
+                "costo": float(self.servicio.costo) if hasattr(self.servicio, 'costo') else None
             }
+        else:
+            # Si el servicio no está cargado, al menos incluir valores por defecto
+            result["servicio"] = {
+                "id": str(self.servicio_id),
+                "nombre": "Servicio",  # Valor por defecto
+                "duracion_minutos": None,
+                "costo": None
+            }
+
+        return result
 
         return base_dict
