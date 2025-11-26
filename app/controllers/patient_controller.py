@@ -310,6 +310,57 @@ async def get_all_owners(
         ) from exc
 
 
+@router.get("/owners/me", response_model=dict, status_code=status.HTTP_200_OK)
+async def get_my_owner_profile(
+        db: Session = Depends(get_db),
+        current_user=Depends(get_current_active_user),
+):
+    """
+    Obtiene el registro de propietario del usuario autenticado
+
+    **Requiere:** Token JWT válido
+    **Acceso:** Cualquier usuario autenticado (especialmente propietarios)
+
+    **Comportamiento:**
+    - Si el usuario tiene un registro de propietario, lo retorna con sus mascotas
+    - Si el usuario no tiene registro de propietario, retorna 404
+    - Los usuarios staff también pueden usar este endpoint
+
+    Returns:
+        OwnerWithPetsResponse: Datos del propietario con sus mascotas
+    """
+    try:
+        owner_repo = OwnerRepository(db)
+
+        # Buscar el propietario por usuario_id
+        owner = owner_repo.get_by_usuario_id(current_user.id)
+
+        if not owner:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="No se encontró un registro de propietario para este usuario"
+            )
+
+        # Cargar las mascotas del propietario (si hay relación cargada)
+        if not owner.mascotas:
+            # Si no se cargó la relación, hacer una consulta explícita
+            owner = owner_repo.get_by_id(owner.id)
+
+        return success_response(
+            message="Perfil de propietario obtenido exitosamente",
+            data=OwnerWithPetsResponse.model_validate(owner).model_dump(mode="json"),
+            status_code=status.HTTP_200_OK
+        )
+
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error al obtener perfil de propietario: {str(exc)}"
+        ) from exc
+
+
 @router.get("/owners/{owner_id}", response_model=dict, status_code=status.HTTP_200_OK)
 async def get_owner_by_id(
     owner_id: UUID = Path(..., description="ID del propietario"),
