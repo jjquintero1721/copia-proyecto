@@ -168,7 +168,7 @@ async def get_appointments_by_date(
         return success_response(
             data={
                 "total": len(appointments),
-                "citas": [apt.to_dict() for apt in appointments]
+                "citas": [apt.to_dict_with_relations() for apt in appointments]
             },
             message="Citas obtenidas exitosamente"
         )

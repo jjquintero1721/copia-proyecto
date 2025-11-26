@@ -126,7 +126,8 @@ class AppointmentService:
         return self.get_all_appointments(
             fecha_desde=fecha_inicio,
             fecha_hasta=fecha_fin,
-            veterinario_id=veterinario_id
+            veterinario_id=veterinario_id,
+            load_relations=True
         )
 
     def reschedule_appointment(
