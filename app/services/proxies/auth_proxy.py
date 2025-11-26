@@ -42,7 +42,7 @@ class AuthProxy:
     PERMISSIONS = {
         'create_appointment': [UserRole.SUPERADMIN, UserRole.VETERINARIO, UserRole.AUXILIAR, UserRole.PROPIETARIO],
         'view_appointment': [UserRole.SUPERADMIN, UserRole.VETERINARIO, UserRole.AUXILIAR, UserRole.PROPIETARIO],
-        'view_all_appointments': [UserRole.SUPERADMIN, UserRole.VETERINARIO, UserRole.AUXILIAR],
+        'view_all_appointments': [UserRole.SUPERADMIN, UserRole.VETERINARIO, UserRole.AUXILIAR, UserRole.PROPIETARIO],
         'reschedule_appointment': [UserRole.SUPERADMIN, UserRole.VETERINARIO, UserRole.AUXILIAR, UserRole.PROPIETARIO],
         'cancel_appointment': [UserRole.SUPERADMIN, UserRole.VETERINARIO, UserRole.AUXILIAR, UserRole.PROPIETARIO],
         'confirm_appointment': [UserRole.SUPERADMIN, UserRole.VETERINARIO, UserRole.AUXILIAR],
@@ -138,16 +138,23 @@ class AuthProxy:
         """
         self._verify_permission('view_all_appointments')
 
-        # Delegar al servicio real
-        appointments = self._real_service.get_appointments(fecha, veterinario_id, estado)
-
-        # Si es cliente, filtrar solo sus citas
+        # Si es propietario, usar método con privacidad
         if self._current_user.rol == UserRole.PROPIETARIO:
-            appointments = [
-                apt for apt in appointments
-                if apt.mascota.propietario_id == self._current_user.id
-            ]
+            # Obtener el ID del propietario desde la relación user->owner
+            if not self._current_user.propietario:
+                logger.error(f"❌ Usuario propietario {self._current_user.id} no tiene registro de propietario")
+                return []
 
+            owner_id = self._current_user.propietario.id
+            return self._real_service.get_appointments_for_owner(
+                owner_id=owner_id,
+                fecha=fecha,
+                veterinario_id=veterinario_id,
+                estado=estado
+            )
+
+        # Staff ve todas las citas sin filtro
+        appointments = self._real_service.get_appointments(fecha, veterinario_id, estado)
         return appointments
 
     def reschedule_appointment(

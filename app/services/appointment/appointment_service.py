@@ -15,10 +15,14 @@ from app.repositories.service_repository import ServiceRepository
 from app.repositories.pet_repository import PetRepository
 from app.repositories.user_repository import UserRepository
 from app.schemas.appointment_schema import AppointmentCreate, AppointmentUpdate
+from app.schemas.appointment_schema import convert_to_private_response, AppointmentPrivateResponse
 
 from .states import AppointmentStateManager
 from .strategies import GestorAgendamiento, PoliticaEstandar, PoliticaReprogramacion
 from .observers import get_gestor_citas
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class AppointmentService:
@@ -309,3 +313,55 @@ class AppointmentService:
             raise ValueError("El servicio no existe")
         if not servicio.activo:
             raise ValueError("El servicio no está disponible")
+
+    def get_appointments_for_owner(
+            self,
+            owner_id: UUID,
+            fecha: Optional[date] = None,
+            veterinario_id: Optional[UUID] = None,
+            estado: Optional[AppointmentStatus] = None
+    ) -> List[AppointmentPrivateResponse]:
+        """
+        Obtiene citas con filtrado de privacidad para propietarios
+
+        - Muestra TODAS las citas (para que vean disponibilidad)
+        - Oculta información sensible de citas de otros propietarios
+        - Muestra información completa solo de SUS citas
+
+        Args:
+            owner_id: ID del propietario actual
+            fecha: Filtro opcional por fecha
+            veterinario_id: Filtro opcional por veterinario
+            estado: Filtro opcional por estado
+
+        Returns:
+            Lista de citas con información filtrada según privacidad
+
+        Relaciona con: RF-07, RN10, RNF-07
+        """
+        logger.info(f"📋 Obteniendo citas con privacidad para propietario {owner_id}")
+
+        # Obtener todas las citas (sin filtrar por propietario)
+        fecha_desde = None
+        fecha_hasta = None
+
+        if fecha:
+            fecha_desde = datetime.combine(fecha, datetime.min.time())
+            fecha_hasta = datetime.combine(fecha, datetime.max.time())
+
+        # Obtener citas del repositorio
+        appointments = self._appointment_repository.list(
+            estado=estado,
+            veterinario_id=veterinario_id,
+            fecha_desde=fecha_desde,
+            fecha_hasta=fecha_hasta
+        )
+
+        # Convertir a formato privado
+        private_appointments = [
+            convert_to_private_response(apt, owner_id)
+            for apt in appointments
+        ]
+
+        logger.info(f"✅ Retornando {len(private_appointments)} citas con privacidad aplicada")
+        return private_appointments
