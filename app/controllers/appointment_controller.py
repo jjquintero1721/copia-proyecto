@@ -226,7 +226,7 @@ async def reschedule_appointment(
 async def confirm_appointment(
         appointment_id: UUID,
         db: Session = Depends(get_db),
-        current_user: User = Depends(require_staff)
+        current_user: User = Depends(get_current_active_user)
 ):
     try:
         cmd = ConfirmAppointmentCommand(
