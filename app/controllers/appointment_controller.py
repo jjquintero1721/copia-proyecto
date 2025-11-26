@@ -51,7 +51,7 @@ MSG_CITA_NO_ENCONTRADA = "Cita no encontrada"
 async def create_appointment(
         appointment_data: AppointmentCreate,
         db: Session = Depends(get_db),
-        current_user: User = Depends(require_staff)
+        current_user: User = Depends(get_current_active_user)
 ):
     """
     Agenda una nueva cita
