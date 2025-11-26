@@ -161,6 +161,17 @@ class Appointment(Base):
                 "raza": None
             }
 
+        if self.mascota and hasattr(self.mascota, 'owner') and self.mascota.owner:
+            result["propietario"] = {
+                "id": str(self.mascota.owner.id),
+                "nombre": self.mascota.owner.nombre,
+                "correo": self.mascota.owner.correo if hasattr(self.mascota.owner, 'correo') else None,
+                "telefono": self.mascota.owner.telefono if hasattr(self.mascota.owner, 'telefono') else None
+            }
+        else:
+            # Si no está cargado el propietario, dejar como None o valor por defecto
+            result["propietario"] = None
+
             # ✅ CORRECCIÓN: Incluir información del veterinario si está cargado
         if self.veterinario:
             result["veterinario"] = {
