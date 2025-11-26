@@ -10,7 +10,7 @@ from uuid import UUID
 from datetime import datetime, timedelta, timezone
 
 from app.models.appointment import Appointment, AppointmentStatus
-
+from app.models.pet import Pet
 
 class AppointmentRepository:
     """
@@ -32,8 +32,7 @@ class AppointmentRepository:
         return (
             self.db.query(Appointment)
             .options(
-                joinedload(Appointment.mascota),
-                joinedload(Appointment.veterinario),
+                joinedload(Appointment.mascota).joinedload(Pet.owner),                joinedload(Appointment.veterinario),
                 joinedload(Appointment.servicio)
             )
             .filter(Appointment.id == appointment_id)
@@ -54,8 +53,7 @@ class AppointmentRepository:
         query = (
             self.db.query(Appointment)
             .options(
-                joinedload(Appointment.mascota),
-                joinedload(Appointment.veterinario),
+                joinedload(Appointment.mascota).joinedload(Pet.owner),                joinedload(Appointment.veterinario),
                 joinedload(Appointment.servicio)
             )
         )
@@ -90,8 +88,7 @@ class AppointmentRepository:
         query = (
             self.db.query(Appointment)
             .options(
-                joinedload(Appointment.mascota),
-                joinedload(Appointment.veterinario),
+                joinedload(Appointment.mascota).joinedload(Pet.owner),                joinedload(Appointment.veterinario),
                 joinedload(Appointment.servicio)
             )
             .filter(
