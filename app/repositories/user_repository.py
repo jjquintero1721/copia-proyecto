@@ -5,7 +5,7 @@ Encapsula las operaciones CRUD sobre el modelo User
 
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
-from typing import Optional, List
+from typing import Optional, List, Any
 from uuid import UUID
 
 from app.models.user import User, UserRole
@@ -85,7 +85,7 @@ class UserRepository:
         """Cuenta usuarios por rol"""
         return self.db.query(User).filter(User.rol == rol).count()
 
-    def search(self, search_term: str, skip: int = 0, limit: int = 100) -> List[User]:
+    def search(self, search_term: str, skip: int = 0, limit: int = 100) -> list[type[User]]:
         """Busca usuarios por nombre o correo"""
         search_pattern = f"%{search_term}%"
         return self.db.query(User).filter(

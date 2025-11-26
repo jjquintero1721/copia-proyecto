@@ -5,7 +5,7 @@ RF-05: Gestión de citas (agendar, reprogramar, cancelar)
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
-from typing import List, Optional, Dict, Any, Union
+from typing import List, Optional, Dict, Any
 from uuid import UUID
 from datetime import datetime, date
 
@@ -16,10 +16,9 @@ from app.schemas.appointment_schema import (
     AppointmentCreate,
     AppointmentUpdate,
     AppointmentResponse,
-    AppointmentStatusEnum,
-    AppointmentPrivateResponse
+    AppointmentStatusEnum
 )
-from app.services.proxies import ProxyFactory, PermissionDeniedException, AuthProxy
+from app.services.proxies import ProxyFactory, PermissionDeniedException
 from app.models.user import User
 from app.models.appointment import AppointmentStatus
 from app.security.dependencies import (
@@ -88,65 +87,64 @@ async def create_appointment(
         )
 
 
-@router.get(
-    "/",
-    response_model=Union[List[AppointmentResponse], List[AppointmentPrivateResponse]],
-    summary="Listar citas",
-    description="""
-    Lista todas las citas con filtros opcionales.
-
-    **Permisos:**
-    - Superadmin, Veterinario, Auxiliar: Ven TODAS las citas con información completa  
-    - Propietario: Ve TODAS las citas PERO con privacidad:  
-      * Sus propias citas: información completa  
-      * Citas de otros: solo información mínima ("Cita agendada")
-
-    **Filtros disponibles:**
-    - fecha: Filtrar por fecha específica  
-    - veterinario_id: Filtrar por veterinario  
-    - estado: Filtrar por estado (agendada, confirmada, etc.)  
-    """
-)
+@router.get("/", response_model=dict)
 async def list_appointments(
-        fecha: Optional[date] = Query(None, description="Fecha para filtrar citas"),
-        veterinario_id: Optional[UUID] = Query(None, description="ID del veterinario"),
-        estado: Optional[str] = Query(None, description="Estado de la cita"),
+        skip: int = Query(0, ge=0),
+        limit: int = Query(100, ge=1, le=100),
+        estado: Optional[AppointmentStatusEnum] = None,
+        mascota_id: Optional[UUID] = None,
+        veterinario_id: Optional[UUID] = None,
+        fecha_desde: Optional[datetime] = None,
+        fecha_hasta: Optional[datetime] = None,
+        include_relations: bool = Query(True, description="Incluir información de relaciones"),
         db: Session = Depends(get_db),
         current_user: User = Depends(get_current_active_user)
 ):
     """
-    Lista citas con privacidad según el rol del usuario.
-    El AuthProxy se encarga de aplicar la lógica de acceso.
+    Lista todas las citas con filtros opcionales
     """
     try:
-        # Servicio base
-        appointment_service = AppointmentService(db)
-
-        # Proxy con lógica de autenticación/privacidad
-        auth_proxy = AuthProxy(
-            real_service=appointment_service,
+        # PROXY
+        appointment_service = ProxyFactory.create_appointment_service_with_cache_and_auth(
+            db=db,
             current_user=current_user
         )
 
-        # El proxy ya filtra según rol y devuelve el tipo correcto de schema
-        appointments = auth_proxy.get_appointments(
-            fecha=fecha,
+        status_filter = AppointmentStatus(estado.value) if estado else None
+
+        appointments = appointment_service.get_all_appointments(
+            skip=skip,
+            limit=limit,
+            estado=status_filter,
+            mascota_id=mascota_id,
             veterinario_id=veterinario_id,
-            estado=estado
+            fecha_desde=fecha_desde,
+            fecha_hasta=fecha_hasta,
+            load_relations=include_relations
         )
 
-        return appointments
+        if include_relations:
+            citas_serialized = [a.to_dict_with_relations() for a in appointments]
+        else:
+            citas_serialized = [a.to_dict() for a in appointments]
+
+        return success_response(
+            data={
+                "total": len(appointments),
+                "citas": citas_serialized,
+            },
+            message="Lista de citas"
+        )
 
     except PermissionDeniedException as exc:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=str(exc)
         )
-
     except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error al listar citas: {str(exc)}"
+            detail=f"Error al obtener citas: {str(exc)}"
         )
 
 
