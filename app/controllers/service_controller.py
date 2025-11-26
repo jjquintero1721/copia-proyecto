@@ -271,3 +271,39 @@ async def search_services(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error en la búsqueda: {str(exc)}"
         )
+
+
+@router.put("/{service_id}/activate", response_model=dict)
+async def activate_service(
+    service_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_staff)
+):
+    """
+    Activa un servicio previamente desactivado
+
+    **Requiere:** Token JWT válido
+    **Acceso:** Staff (Superadmin, Veterinario, Auxiliar)
+
+    **RF-09:** Gestión de servicios ofrecidos
+    **Descripción:** Cambia el estado de un servicio de inactivo a activo
+    """
+    try:
+        service_service = ServiceService(db)
+        service = service_service.activate_service(service_id)
+
+        return success_response(
+            data=service.to_dict(),
+            message="Servicio activado exitosamente"
+        )
+
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc)
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error al activar servicio: {str(exc)}"
+        )

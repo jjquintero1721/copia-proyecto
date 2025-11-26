@@ -163,3 +163,31 @@ class ServiceService:
             Lista de servicios encontrados
         """
         return self.repository.search(search_term, skip, limit)
+
+    def activate_service(self, service_id: UUID) -> Service:
+        """
+        Activa un servicio previamente desactivado
+
+        Args:
+            service_id: UUID del servicio a activar
+
+        Returns:
+            Service: Servicio activado
+
+        Raises:
+            ValueError: Si el servicio no existe
+
+        **RF-09:** Gestión de servicios ofrecidos
+        **Regla de negocio:** Solo usuarios con rol staff pueden activar servicios
+        """
+        # Buscar servicio
+        service = self.repository.get_by_id(service_id)
+
+        if not service:
+            raise ValueError(f"Servicio con ID {service_id} no encontrado")
+
+        # Activar servicio
+        service.activo = True
+
+        # Actualizar en base de datos
+        return self.repository.update(service)
