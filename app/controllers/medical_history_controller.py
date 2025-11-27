@@ -349,3 +349,119 @@ async def list_consultations_by_history(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error al listar consultas: {str(exc)}"
         )
+
+@router.get("/consultas/by-cita/{cita_id}", response_model=dict)
+async def get_consultation_by_appointment(
+    cita_id: UUID = Path(..., description="ID de la cita"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Obtiene la consulta asociada a una cita específica
+
+    **Requiere:** Token JWT válido
+    **Acceso:** Cualquier usuario autenticado
+
+    **Casos de uso:**
+    - Al abrir el panel de gestión de cita
+    - Para verificar si ya existe una consulta antes de crear una nueva
+    - Para cargar datos de consulta existente en el formulario
+
+    **Retorna:**
+    - 200: Consulta encontrada
+    - 404: No existe consulta para esta cita (normal si es la primera vez)
+    """
+    try:
+        service = MedicalHistoryService(db)
+        consultation = service.consultation_repo.get_by_cita(cita_id)
+
+        if not consultation:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Consulta no encontrada para esta cita"
+            )
+
+        return success_response(
+            data=ConsultationResponse.model_validate(consultation).model_dump(mode="json"),
+            message="Consulta encontrada"
+        )
+
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error al obtener consulta: {str(exc)}"
+        )
+
+
+@router.get("/citas/{cita_id}/consulta", response_model=dict)
+async def get_consultation_by_appointment(
+        cita_id: UUID = Path(..., description="ID de la cita"),
+        db: Session = Depends(get_db),
+        current_user: User = Depends(get_current_active_user)
+):
+    """
+    Obtiene la consulta asociada a una cita específica
+
+    **Requiere:** Token JWT válido
+    **Acceso:** Cualquier usuario autenticado
+
+    **Casos de uso:**
+    - Cargar consulta existente al abrir panel de gestión de cita
+    - Verificar si una cita ya tiene consulta creada
+    - Permitir continuar editando consulta guardada previamente
+
+    **Problema que soluciona:**
+    El frontend necesita verificar si una cita ya tiene una consulta creada
+    cuando el usuario reabre la aplicación o navega a una cita existente.
+
+    **Retorna:**
+    - 200: Consulta encontrada (incluye todos los datos de la consulta)
+    - 404: No existe consulta para esta cita (es normal si aún no se ha creado)
+
+    **Ejemplo de respuesta exitosa (200):**
+    ```json
+    {
+      "success": true,
+      "message": "Consulta encontrada para la cita",
+      "data": {
+        "id": "uuid-de-consulta",
+        "cita_id": "uuid-de-cita",
+        "motivo": "Control post-operatorio",
+        "anamnesis": "...",
+        "diagnostico": "...",
+        ...
+      }
+    }
+    ```
+
+    **Ejemplo de respuesta cuando no existe (404):**
+    ```json
+    {
+      "detail": "No existe consulta para esta cita"
+    }
+    ```
+    """
+    try:
+        service = MedicalHistoryService(db)
+        consultation = service.get_consultation_by_cita(cita_id)
+
+        if not consultation:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="No existe consulta para esta cita"
+            )
+
+        return success_response(
+            data=ConsultationResponse.model_validate(consultation).model_dump(mode="json"),
+            message="Consulta encontrada para la cita"
+        )
+
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error al obtener consulta por cita: {str(exc)}"
+        )

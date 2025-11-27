@@ -161,6 +161,30 @@ class MedicalHistoryService:
             limit
         )
 
+    def get_consultation_by_cita(self, cita_id: UUID) -> Optional[Consultation]:
+        """
+        Obtiene la consulta asociada a una cita específica
+
+        Este método permite cargar consultas existentes cuando se reabre una cita,
+        solucionando el problema de que el frontend no puede recuperar consultas
+        guardadas previamente.
+
+        Args:
+            cita_id: ID de la cita
+
+        Returns:
+            Consultation si existe, None si no existe consulta para esta cita
+
+        Example:
+            >>> service = MedicalHistoryService(db)
+            >>> consulta = service.get_consultation_by_cita(cita_id)
+            >>> if consulta:
+            >>>     print(f"Consulta encontrada: {consulta.motivo}")
+            >>> else:
+            >>>     print("Esta cita aún no tiene consulta creada")
+        """
+        return self.consultation_repo.get_by_cita(cita_id)
+
     # ==================== HISTORIA CLÍNICA ====================
 
     def get_medical_history_complete(
