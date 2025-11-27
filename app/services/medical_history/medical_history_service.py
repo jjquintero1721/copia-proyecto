@@ -124,7 +124,6 @@ class MedicalHistoryService:
             raise ValueError(self.CONSULTA_NOT_FOUND_MSG)
 
         # Guardar memento antes de actualizar (Memento Pattern)
-        nueva_version = consultation.version + 1
         self._save_memento(
             consultation,
             actualizado_por,
@@ -138,7 +137,7 @@ class MedicalHistoryService:
                 setattr(consultation, field, value)
 
         # Actualizar auditoría (RN10-2)
-        consultation.version = nueva_version
+        consultation.version = consultation.version + 1
         consultation.actualizado_por = actualizado_por
         consultation.fecha_actualizacion = datetime.now(timezone.utc)
 
