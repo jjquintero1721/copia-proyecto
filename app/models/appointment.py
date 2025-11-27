@@ -149,7 +149,8 @@ class Appointment(Base):
                 "id": str(self.mascota.id),
                 "nombre": self.mascota.nombre,
                 "especie": self.mascota.especie,
-                "raza": self.mascota.raza if hasattr(self.mascota, 'raza') else None
+                "raza": self.mascota.raza if hasattr(self.mascota, 'raza') else None,
+                "historia_clinica_id": str(self.mascota.historia_clinica.id) if hasattr(self.mascota, 'historia_clinica') and self.mascota.historia_clinica else None
             }
 
         else:
@@ -158,7 +159,8 @@ class Appointment(Base):
                 "id": str(self.mascota_id),
                 "nombre": "Mascota",  # Valor por defecto
                 "especie": None,
-                "raza": None
+                "raza": None,
+                "historia_clinica_id": None
             }
 
         if self.mascota and hasattr(self.mascota, 'owner') and self.mascota.owner:
@@ -172,7 +174,7 @@ class Appointment(Base):
             # Si no está cargado el propietario, dejar como None o valor por defecto
             result["propietario"] = None
 
-            # ✅ CORRECCIÓN: Incluir información del veterinario si está cargado
+            # Incluir información del veterinario si está cargado
         if self.veterinario:
             result["veterinario"] = {
                 "id": str(self.veterinario.id),
@@ -187,7 +189,7 @@ class Appointment(Base):
                 "correo": None
             }
 
-            # ✅ CORRECCIÓN: Incluir información del servicio si está cargado
+            #  Incluir información del servicio si está cargado
         if self.servicio:
             result["servicio"] = {
                 "id": str(self.servicio.id),

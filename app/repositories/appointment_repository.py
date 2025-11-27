@@ -32,7 +32,9 @@ class AppointmentRepository:
         return (
             self.db.query(Appointment)
             .options(
-                joinedload(Appointment.mascota).joinedload(Pet.owner),                joinedload(Appointment.veterinario),
+                joinedload(Appointment.mascota).joinedload(Pet.owner),
+                joinedload(Appointment.mascota).joinedload(Pet.historia_clinica),
+                joinedload(Appointment.veterinario),
                 joinedload(Appointment.servicio)
             )
             .filter(Appointment.id == appointment_id)
@@ -53,7 +55,9 @@ class AppointmentRepository:
         query = (
             self.db.query(Appointment)
             .options(
-                joinedload(Appointment.mascota).joinedload(Pet.owner),                joinedload(Appointment.veterinario),
+                joinedload(Appointment.mascota).joinedload(Pet.owner),
+                joinedload(Appointment.mascota).joinedload(Pet.historia_clinica),
+                joinedload(Appointment.veterinario),
                 joinedload(Appointment.servicio)
             )
         )
