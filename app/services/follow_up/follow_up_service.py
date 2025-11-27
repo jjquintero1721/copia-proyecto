@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from typing import Optional, List, Dict, Any
 from uuid import UUID
 from datetime import datetime, timezone, timedelta
+from app.utils.datetime_helpers import ensure_timezone_aware, now_utc
 
 from app.models.appointment import Appointment, AppointmentStatus
 from app.models.consultation import Consultation
@@ -81,8 +82,10 @@ class FollowUpService:
             raise ValueError("El servicio especificado no está activo")
 
         # 3. Validar que la fecha de seguimiento sea futura
-        if follow_up_data.fecha_hora_seguimiento <= datetime.now(timezone.utc):
+        fecha_seguimiento_aware = ensure_timezone_aware(follow_up_data.fecha_hora_seguimiento)
+        if fecha_seguimiento_aware <= now_utc():
             raise ValueError("La fecha de seguimiento debe ser futura")
+
 
         # 4. Validar disponibilidad del veterinario
         if not self.appointment_repo.check_availability(
