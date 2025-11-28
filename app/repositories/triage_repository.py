@@ -3,13 +3,14 @@ Repositorio de Triage - Capa de acceso a datos
 RF-08: Triage (clasificación de prioridad)
 """
 
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import desc
 from typing import Optional, List
 from uuid import UUID
 from datetime import datetime
 
 from app.models.triage import Triage, TriagePriority
+from app.models.pet import Pet   # ⭐ REQUERIDO PARA joinedload
 
 
 class TriageRepository:
@@ -43,7 +44,10 @@ class TriageRepository:
     ) -> List[Triage]:
         """Obtiene todos los triages de una mascota"""
         return (
-            self.db.query(Triage)
+            self.db.query(Triage).options(
+                joinedload(Triage.mascota).joinedload(Pet.owner),
+                joinedload(Triage.usuario)
+            )
             .filter(Triage.mascota_id == mascota_id)
             .order_by(desc(Triage.fecha_creacion))
             .offset(skip)
@@ -60,7 +64,10 @@ class TriageRepository:
         fecha_hasta: Optional[datetime] = None
     ) -> List[Triage]:
         """Obtiene todos los triages con filtros opcionales"""
-        query = self.db.query(Triage)
+        query = self.db.query(Triage).options(
+            joinedload(Triage.mascota).joinedload(Pet.owner),  # ✅ relaciones completas
+            joinedload(Triage.usuario)
+        )
 
         if prioridad:
             query = query.filter(Triage.prioridad == prioridad)

@@ -113,8 +113,9 @@ class Triage(Base):
     usuario = relationship("User", foreign_keys=[usuario_id])
 
     def to_dict(self) -> dict:
-        """Convierte el triage a diccionario"""
-        return {
+
+        # Datos básicos del triage
+        triage_data = {
             "id": str(self.id),
             "cita_id": str(self.cita_id) if self.cita_id else None,
             "mascota_id": str(self.mascota_id),
@@ -130,6 +131,71 @@ class Triage(Base):
             "observaciones": self.observaciones,
             "fecha_creacion": self.fecha_creacion.isoformat()
         }
+
+        # ✅ NUEVO: Incluir datos de la mascota si la relación está cargada
+        if self.mascota:
+            triage_data["mascota"] = {
+                "id": str(self.mascota.id),
+                "nombre": self.mascota.nombre,
+                "especie": self.mascota.especie,
+                "raza": self.mascota.raza,
+                "microchip": self.mascota.microchip,
+            }
+
+            # ✅ NUEVO: Incluir datos del propietario si están cargados
+            # Nota: Pet tiene relación 'owner' con Owner
+            if hasattr(self.mascota, 'owner') and self.mascota.owner:
+                triage_data["propietario"] = {
+                    "id": str(self.mascota.owner.id),
+                    "nombre": self.mascota.owner.nombre,
+                    "telefono": self.mascota.owner.telefono,
+                    "correo": self.mascota.owner.correo,
+                }
+            else:
+                # Si no está cargado, solo poner el ID
+                triage_data["propietario"] = {
+                    "id": str(self.mascota.propietario_id) if self.mascota.propietario_id else None,
+                    "nombre": "No disponible",
+                    "telefono": "No disponible",
+                    "correo": "No disponible",
+                }
+        else:
+            # Si mascota no está cargada, poner valores por defecto
+            triage_data["mascota"] = {
+                "id": str(self.mascota_id),
+                "nombre": "No disponible",
+                "especie": "No disponible",
+                "raza": None,
+                "microchip": None,
+            }
+            triage_data["propietario"] = {
+                "id": None,
+                "nombre": "No disponible",
+                "apellido": "",
+                "telefono": "No disponible",
+                "correo": "No disponible",
+            }
+
+        # ✅ NUEVO: Incluir datos del usuario que registró el triage (si está cargado)
+        if self.usuario:
+            triage_data["registrado_por"] = {
+                "id": str(self.usuario.id),
+                "nombre": self.usuario.nombre,
+                "correo": self.usuario.correo,
+                "rol": self.usuario.rol.value if hasattr(self.usuario, 'rol') else None
+            }
+        else:
+            triage_data["registrado_por"] = {
+                "id": str(self.usuario_id),
+                "nombre": "No disponible",
+                "correo": "No disponible",
+                "rol": None
+            }
+
+        return triage_data
+
+
+
 
     def __repr__(self):
         return f"<Triage(id={self.id}, mascota_id={self.mascota_id}, prioridad={self.prioridad})>"

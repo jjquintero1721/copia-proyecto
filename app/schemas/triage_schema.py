@@ -97,7 +97,7 @@ class TriageResponse(BaseModel):
     id: UUID
     cita_id: Optional[UUID]
     mascota_id: UUID
-    usuario_id: UUID
+    usuario_id: Optional[UUID]
     estado_general: str
     fc: int
     fr: int
