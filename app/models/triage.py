@@ -134,30 +134,43 @@ class Triage(Base):
 
         # ✅ NUEVO: Incluir datos de la mascota si la relación está cargada
         if self.mascota:
+            # Calcular edad si tiene fecha de nacimiento
+            edad = None
+            if self.mascota.fecha_nacimiento:
+                today = datetime.now(timezone.utc).date()
+                edad = today.year - self.mascota.fecha_nacimiento.year
+                # Ajustar si aún no ha cumplido años este año
+                if (today.month, today.day) < (self.mascota.fecha_nacimiento.month, self.mascota.fecha_nacimiento.day):
+                    edad -= 1
+
             triage_data["mascota"] = {
                 "id": str(self.mascota.id),
                 "nombre": self.mascota.nombre,
                 "especie": self.mascota.especie,
                 "raza": self.mascota.raza,
                 "microchip": self.mascota.microchip,
+                "edad": edad,
+                "fecha_nacimiento": self.mascota.fecha_nacimiento.isoformat() if self.mascota.fecha_nacimiento else None
             }
 
-            # ✅ NUEVO: Incluir datos del propietario si están cargados
-            # Nota: Pet tiene relación 'owner' con Owner
+            # ✅ CRÍTICO: Incluir datos del propietario si están cargados
+            # Pet tiene la relación 'owner' con Owner
             if hasattr(self.mascota, 'owner') and self.mascota.owner:
-                triage_data["propietario"] = {
+                triage_data["mascota"]["propietario"] = {
                     "id": str(self.mascota.owner.id),
                     "nombre": self.mascota.owner.nombre,
+                    "apellido": self.mascota.owner.apellido if hasattr(self.mascota.owner, 'apellido') else "",
                     "telefono": self.mascota.owner.telefono,
-                    "correo": self.mascota.owner.correo,
+                    "correo": self.mascota.owner.correo
                 }
             else:
-                # Si no está cargado, solo poner el ID
-                triage_data["propietario"] = {
+                # Si no está cargado, poner valores por defecto
+                triage_data["mascota"]["propietario"] = {
                     "id": str(self.mascota.propietario_id) if self.mascota.propietario_id else None,
                     "nombre": "No disponible",
+                    "apellido": "",
                     "telefono": "No disponible",
-                    "correo": "No disponible",
+                    "correo": "No disponible"
                 }
         else:
             # Si mascota no está cargada, poner valores por defecto
@@ -167,16 +180,18 @@ class Triage(Base):
                 "especie": "No disponible",
                 "raza": None,
                 "microchip": None,
-            }
-            triage_data["propietario"] = {
-                "id": None,
-                "nombre": "No disponible",
-                "apellido": "",
-                "telefono": "No disponible",
-                "correo": "No disponible",
+                "edad": None,
+                "fecha_nacimiento": None,
+                "propietario": {
+                    "id": None,
+                    "nombre": "No disponible",
+                    "apellido": "",
+                    "telefono": "No disponible",
+                    "correo": "No disponible"
+                }
             }
 
-        # ✅ NUEVO: Incluir datos del usuario que registró el triage (si está cargado)
+            # ✅ NUEVO: Incluir datos del usuario que registró el triage (si está cargado)
         if self.usuario:
             triage_data["registrado_por"] = {
                 "id": str(self.usuario.id),

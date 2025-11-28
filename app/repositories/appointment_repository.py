@@ -5,7 +5,7 @@ RF-05: Gestión de citas
 
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import and_, or_
-from typing import Optional, List, Any
+from typing import Optional, List, Any, Union
 from uuid import UUID
 from datetime import datetime, timedelta, timezone
 
@@ -180,9 +180,25 @@ class AppointmentRepository:
             )
         ).offset(skip).limit(limit).all()
 
-    def count_by_status(self, estado: AppointmentStatus) -> int:
-        """Cuenta citas por estado"""
-        return self.db.query(Appointment).filter(Appointment.estado == estado).count()
+    def count_by_status(self, estados: Union[AppointmentStatus, List[AppointmentStatus]]) -> int:
+        """
+        Cuenta citas por estado(s)
+
+        Args:
+            estados: Un estado único o una lista de estados
+
+        Returns:
+            int: Total de citas con el/los estado(s) especificado(s)
+        """
+        from typing import List, Union
+
+        # Convertir a lista si es un solo estado
+        if isinstance(estados, AppointmentStatus):
+            estados = [estados]
+
+        return self.db.query(Appointment).filter(
+            Appointment.estado.in_(estados)
+        ).count()
 
     def count_by_date_range(self, fecha_inicio: datetime, fecha_fin: datetime) -> int:
         """Cuenta citas en un rango de fechas"""
@@ -192,3 +208,53 @@ class AppointmentRepository:
                 Appointment.fecha_hora <= fecha_fin
             )
         ).count()
+
+    def get_by_mascota(
+            self,
+            mascota_id: UUID,
+            estado: Optional[AppointmentStatus] = None,
+            fecha_desde: Optional[datetime] = None,
+            fecha_hasta: Optional[datetime] = None,
+            skip: int = 0,
+            limit: int = 100
+    ) -> List[Appointment]:
+        """
+        Obtiene todas las citas asociadas a una mascota específica
+
+        Args:
+            mascota_id: ID de la mascota
+            estado: Filtro opcional por estado de la cita
+            fecha_desde: Fecha inicial del rango
+            fecha_hasta: Fecha final del rango
+            skip: Paginación - saltar registros
+            limit: Paginación - límite de registros
+
+        Returns:
+            Lista de citas correspondientes a la mascota
+        """
+        query = (
+            self.db.query(Appointment)
+            .options(
+                joinedload(Appointment.mascota).joinedload(Pet.owner),
+                joinedload(Appointment.mascota).joinedload(Pet.historia_clinica),
+                joinedload(Appointment.veterinario),
+                joinedload(Appointment.servicio)
+            )
+            .filter(Appointment.mascota_id == mascota_id)
+        )
+
+        if estado:
+            query = query.filter(Appointment.estado == estado)
+
+        if fecha_desde:
+            query = query.filter(Appointment.fecha_hora >= fecha_desde)
+
+        if fecha_hasta:
+            query = query.filter(Appointment.fecha_hora <= fecha_hasta)
+
+        return (
+            query.order_by(Appointment.fecha_hora.desc())
+            .offset(skip)
+            .limit(limit)
+            .all()
+        )

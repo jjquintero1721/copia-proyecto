@@ -57,7 +57,8 @@ medical_history_controller,
 appointment_controller,
 inventory_controller,
 follow_up_controller,
-notification_settings_controller
+notification_settings_controller,
+dashboard_controller
 )
 
 # Registrar rutas
@@ -121,6 +122,12 @@ app.include_router(
     notification_settings_controller.router,
     prefix="/api/v1/notifications",
     tags=["Notificaciones"]
+)
+
+app.include_router(
+    dashboard_controller.router,
+    prefix="/api/v1/dashboard",
+    tags=["Dashboard"]
 )
 
 # Endpoint raíz

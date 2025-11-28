@@ -30,12 +30,25 @@ class TriageRepository:
 
     def get_by_id(self, triage_id: UUID) -> Optional[Triage]:
         """Obtiene un triage por ID"""
-        return self.db.query(Triage).filter(Triage.id == triage_id).first()
+        return (self.db.query(Triage)
+                .options(
+                    joinedload(Triage.mascota).joinedload(Pet.owner),  # ✅ CORREGIDO
+                    joinedload(Triage.usuario)
+                )
+                .filter(Triage.id == triage_id)
+                .first())
 
     def get_by_cita_id(self, cita_id: UUID) -> Optional[Triage]:
         """Obtiene el triage asociado a una cita"""
-        return self.db.query(Triage).filter(Triage.cita_id == cita_id).first()
-
+        return (
+            self.db.query(Triage)
+            .options(
+                joinedload(Triage.mascota).joinedload(Pet.owner),  # ✅ CORREGIDO
+                joinedload(Triage.usuario)
+            )
+            .filter(Triage.cita_id == cita_id)
+            .first()
+        )
     def get_by_mascota_id(
         self,
         mascota_id: UUID,
@@ -93,6 +106,10 @@ class TriageRepository:
         """
         return (
             self.db.query(Triage)
+            .options(
+                joinedload(Triage.mascota).joinedload(Pet.owner),
+                joinedload(Triage.usuario)
+            )
             .filter(Triage.prioridad.in_([TriagePriority.URGENTE, TriagePriority.ALTA]))
             .order_by(
                 Triage.prioridad.desc(),
