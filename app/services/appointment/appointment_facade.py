@@ -83,7 +83,7 @@ class AppointmentFacade:
                 "id": str(mascota.id),
                 "nombre": mascota.nombre,
                 "especie": mascota.especie,
-                "historia_clinica_id": str(mascota.historia_clinica_id) if mascota.historia_clinica else None
+                "historia_clinica_id": str(mascota.historia_clinica.id) if mascota.historia_clinica else None
             },
             "veterinario": {
                 "id": str(veterinario.id),

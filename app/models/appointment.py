@@ -208,5 +208,3 @@ class Appointment(Base):
             }
 
         return result
-
-        return base_dict

@@ -5,7 +5,7 @@ Integra todos los patrones de diseño
 """
 
 from sqlalchemy.orm import Session, joinedload
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from uuid import UUID
 from datetime import datetime, date
 
@@ -19,7 +19,7 @@ from app.schemas.appointment_schema import AppointmentCreate, AppointmentUpdate
 from .states import AppointmentStateManager
 from .strategies import GestorAgendamiento, PoliticaEstandar, PoliticaReprogramacion
 from .observers import get_gestor_citas
-from ...models import Pet
+from app.models.pet import Pet
 
 
 class AppointmentService:
@@ -114,10 +114,10 @@ class AppointmentService:
             logger = logging.getLogger(__name__)
             logger.error(f"❌ Error en observers (cita guardada exitosamente): {str(e)}")
 
-            # 9. ✅ CORRECCIÓN CRÍTICA: Expunge del session antes de retornar
-            # Esto previene errores de serialización cuando el controller intenta usar el objeto
-        db.expunge(appointment)
+        # 9. ✅ CORRECCIÓN CRÍTICA: Expunge del session antes de retornar
+        # Esto previene errores de serialización cuando el controller intenta usar el objeto
 
+        db.expunge_all()
         return appointment
 
     def get_appointment_by_id(self, appointment_id: UUID) -> Optional[Appointment]:
