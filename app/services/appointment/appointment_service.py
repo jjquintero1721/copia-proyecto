@@ -4,7 +4,7 @@ RF-05: Gestión de citas (agendar, reprogramar, cancelar)
 Integra todos los patrones de diseño
 """
 
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from typing import Optional, List
 from uuid import UUID
 from datetime import datetime, date
@@ -19,6 +19,7 @@ from app.schemas.appointment_schema import AppointmentCreate, AppointmentUpdate
 from .states import AppointmentStateManager
 from .strategies import GestorAgendamiento, PoliticaEstandar, PoliticaReprogramacion
 from .observers import get_gestor_citas
+from ...models import Pet
 
 
 class AppointmentService:
@@ -42,19 +43,24 @@ class AppointmentService:
         # ← CAMBIO IMPORTANTE
         self.gestor_citas = get_gestor_citas(self.db)
 
+    from sqlalchemy.orm import joinedload
+
     def create_appointment(
             self,
             appointment_data: AppointmentCreate,
             creado_por: Optional[UUID] = None
     ) -> Appointment:
 
+        # 1. Validar entidades
         self._validar_entidades(appointment_data)
 
+        # 2. Validar política de agendamiento
         gestor = GestorAgendamiento(PoliticaEstandar())
         es_valida, mensaje_error = gestor.validar(appointment_data.fecha_hora)
         if not es_valida:
             raise ValueError(mensaje_error)
 
+        # 3. Validar disponibilidad
         servicio = self.service_repo.get_by_id(appointment_data.servicio_id)
         if not self.repository.check_availability(
                 veterinario_id=appointment_data.veterinario_id,
@@ -63,6 +69,7 @@ class AppointmentService:
         ):
             raise ValueError("El horario no está disponible.")
 
+        # 4. Crear instancia de la cita
         appointment = Appointment(
             mascota_id=appointment_data.mascota_id,
             veterinario_id=appointment_data.veterinario_id,
@@ -73,16 +80,43 @@ class AppointmentService:
             creado_por=creado_por
         )
 
+        # 5. Guardar en base de datos
         appointment = self.repository.create(appointment)
 
-        self.gestor_citas.notificar(
-            "CITA_CREADA",
-            appointment,
-            {
-                "usuario_id": creado_por,
-                "accion": "Creación de cita"
-            }
-        )
+        # ⚠️ IMPORTANTE: aquí debes acceder al session real
+        db = self.repository.db
+
+        # 6. Commit + Refresh
+        db.commit()
+        db.refresh(appointment)
+
+        # 7. Cargar TODAS las relaciones necesarias para observers
+        # ✅ CORRECCIÓN: Incluir historia_clinica que es requerida por NotificationService
+        appointment = db.query(Appointment).options(
+            joinedload(Appointment.mascota).joinedload(Pet.owner),
+            joinedload(Appointment.mascota).joinedload(Pet.historia_clinica),
+            joinedload(Appointment.veterinario),
+            joinedload(Appointment.servicio)
+        ).filter(Appointment.id == appointment.id).first()
+
+        try:
+            self.gestor_citas.notificar(
+                "CITA_CREADA",
+                appointment,
+                {
+                    "usuario_id": creado_por,
+                    "accion": "Creación de cita"
+                }
+            )
+        except Exception as e:
+            # ⚠️ NO propagar errores de notificación - la cita ya está guardada
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"❌ Error en observers (cita guardada exitosamente): {str(e)}")
+
+            # 9. ✅ CORRECCIÓN CRÍTICA: Expunge del session antes de retornar
+            # Esto previene errores de serialización cuando el controller intenta usar el objeto
+        db.expunge(appointment)
 
         return appointment
 

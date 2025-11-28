@@ -118,7 +118,7 @@ class PetRepository:
             skip: int = 0,
             limit: int = 100,
             activo: Optional[bool] = True
-    ) -> list[type[Pet]]:
+    ) -> List[Pet]:
         """
         Obtiene todas las mascotas de un propietario específico
 

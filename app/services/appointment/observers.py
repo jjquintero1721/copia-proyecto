@@ -158,8 +158,15 @@ class MetricasObserver(AppointmentObserver):
         import logging
         logger = logging.getLogger(__name__)
 
-        logger.info(f"📊 [Métricas] Evento: {evento}")
+        try:
+            logger.info(f"📊 [Métricas] Evento: {evento}")
 
+
+        except Exception as error:
+            logger.error(
+                f"❌ Error al registrar métricas: {str(error)}"
+            )
+            # NO propagar el error - solo loggearlo
 
 
 # ==================== GESTOR DE OBSERVADORES ====================
