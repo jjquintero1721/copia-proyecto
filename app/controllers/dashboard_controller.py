@@ -85,7 +85,7 @@ def get_staff_dashboard_stats(db: Session) -> dict:
                 {
                     "id": str(cita.id),
                     "mascota_nombre": cita.mascota.nombre if cita.mascota else "Sin mascota",
-                    "propietario_nombre": cita.mascota.propietario.nombre if cita.mascota and cita.mascota.propietario else "Sin propietario",
+                    "propietario_nombre": cita.mascota.owner.nombre if cita.mascota and cita.mascota.owner else "Sin propietario",
                     "fecha_hora": cita.fecha_hora.isoformat(),
                     "estado": cita.estado.value,
                     "servicio": cita.servicio.nombre if cita.servicio else "Sin servicio"
