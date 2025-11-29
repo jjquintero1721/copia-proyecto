@@ -227,8 +227,11 @@ class UserService:
 
             user = factory.create_user(user_data, creado_por)
 
+            self.db.add(user)
+            self.db.commit()
+            self.db.refresh(user)
+
             # 3. Crear propietario EN MEMORIA sin commit
-            owner = None
             if user_data.rol == UserRoleEnum.PROPIETARIO:
                 owner = Owner(
                     usuario_id=user.id,
@@ -239,17 +242,8 @@ class UserService:
                     activo=user.activo
                 )
 
-            # 4. Agregar ambos a la sesión (sin commit)
-            self.db.add(user)
-            if owner:
                 self.db.add(owner)
-
-            # 5. UN SOLO COMMIT (transacción atómica)
-            self.db.commit()
-
-            # 6. Refrescar datos
-            self.db.refresh(user)
-            if owner:
+                self.db.commit()
                 self.db.refresh(owner)
 
             return user
