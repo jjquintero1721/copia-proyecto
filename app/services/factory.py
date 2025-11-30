@@ -41,6 +41,9 @@ class EntityFactory:
         raza: Optional[str],
         microchip: Optional[str],
         fecha_nacimiento: Optional[date],
+        color =None,
+        sexo =None,
+        peso  =None,
     ) -> Pet:
         """
         Crea una instancia de la entidad Pet (mascota).
@@ -63,5 +66,8 @@ class EntityFactory:
             raza=raza,
             microchip=microchip,
             fecha_nacimiento=fecha_nacimiento,
+            color=color,
+            sexo=sexo,
+            peso=peso
         )
         return pet

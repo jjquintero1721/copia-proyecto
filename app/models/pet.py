@@ -48,6 +48,10 @@ class Pet(Base):
     # Raza de la mascota (opcional)
     raza = Column(String(120), nullable=True)
 
+    color = Column(String(60), nullable=True)
+    sexo = Column(String(20), nullable=False)  # macho / hembra
+    peso = Column(String(20), nullable=True)
+
     # Código o número de microchip único (opcional, con índice)
     microchip = Column(String(60), nullable=True, unique=True, index=True)
 

@@ -36,6 +36,9 @@ class CreatePetService(CreateTemplate):
         raza: Optional[str] = None,
         microchip: Optional[str] = None,
         fecha_nacimiento: Optional[date] = None,
+        color: Optional[str] = None,
+        sexo: Optional[str] = None,
+        peso: Optional[float] = None
     ):
         """
         Inicializa el servicio con los datos necesarios para registrar una mascota.
@@ -57,6 +60,9 @@ class CreatePetService(CreateTemplate):
         self.microchip = microchip
         self.fecha_nacimiento = fecha_nacimiento
         self.repo = PetRepository(db)  # Repositorio para operaciones con la entidad Pet
+        self.color = color
+        self.sexo = sexo
+        self.peso = peso
 
     def validate(self) -> None:
         """
@@ -85,6 +91,9 @@ class CreatePetService(CreateTemplate):
             raza=self.raza,
             microchip=self.microchip,
             fecha_nacimiento=self.fecha_nacimiento,
+            color=self.color,
+            sexo=self.sexo,
+            peso=self.peso,
         )
 
     def persist(self, entity: Pet) -> Pet:

@@ -17,6 +17,9 @@ class PetCreate(BaseModel):
     nombre: str = Field(..., min_length=2, max_length=120)  # Nombre de la mascota (obligatorio)
     especie: str = Field(..., min_length=2, max_length=60)  # Especie (perro, gato, etc.)
     raza: Optional[str] = Field(None, max_length=120)  # Raza de la mascota (opcional)
+    color: Optional[str] = Field(None, max_length=60)
+    sexo: str = Field(..., min_length=3, max_length=20)
+    peso: Optional[float] = None
     microchip: Optional[str] = Field(None, max_length=60)  # Código del microchip (opcional)
     fecha_nacimiento: Optional[date] = None  # Fecha de nacimiento (opcional)
 
@@ -44,6 +47,9 @@ class PetResponse(BaseModel):
     nombre: str
     especie: str
     raza: Optional[str]
+    color: Optional[str]
+    sexo: str
+    peso: Optional[float]
     microchip: Optional[str]
     fecha_nacimiento: Optional[date]
     activo: bool  # Indica si la mascota está activa en el sistema
@@ -63,6 +69,9 @@ class PetWithOwnerResponse(BaseModel):
     nombre: str
     especie: str
     raza: Optional[str]
+    color: Optional[str]
+    sexo: str
+    peso: Optional[float]
     microchip: Optional[str]
     fecha_nacimiento: Optional[date]
     activo: bool

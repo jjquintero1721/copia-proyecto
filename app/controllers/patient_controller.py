@@ -61,6 +61,9 @@ async def create_pet(
             raza=payload.raza,
             microchip=payload.microchip,
             fecha_nacimiento=payload.fecha_nacimiento,
+            color=payload.color,
+            sexo=payload.sexo,
+            peso=payload.peso,
         )
 
         pet = cmd.execute()

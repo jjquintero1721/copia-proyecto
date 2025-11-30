@@ -11,7 +11,7 @@ from app.services.decorators import AuditDecorator
 # ==================== COMANDO: CREACIÓN DE MASCOTA ====================
 class CreatePetCommand:
     # Constructor: inicializa los datos necesarios para registrar una mascota
-    def __init__(self, db: Session, propietario_id: UUID, nombre: str, especie: str, raza: Optional[str] = None, microchip: Optional[str] = None, fecha_nacimiento: Optional[date] = None):
+    def __init__(self, db: Session, propietario_id: UUID, nombre: str, especie: str, raza: Optional[str] = None, microchip: Optional[str] = None, fecha_nacimiento: Optional[date] = None,color: Optional[str] = None, sexo: Optional[str] = None, peso: Optional[float] = None):
         self.db = db  # Sesión de base de datos
         self.propietario_id = propietario_id  # ID del propietario asociado
         self.nombre = nombre  # Nombre de la mascota
@@ -19,6 +19,9 @@ class CreatePetCommand:
         self.raza = raza  # Raza (opcional)
         self.microchip = microchip  # Número de microchip (opcional)
         self.fecha_nacimiento = fecha_nacimiento  # Fecha de nacimiento (opcional)
+        self.color = color
+        self.sexo = sexo
+        self.peso = peso
 
     # Método principal que ejecuta el comando
     def execute(self):
@@ -31,6 +34,9 @@ class CreatePetCommand:
             raza=self.raza,
             microchip=self.microchip,
             fecha_nacimiento=self.fecha_nacimiento,
+            color=self.color,
+            sexo=self.sexo,
+            peso=self.peso,
         )
         # Aplica el decorador de auditoría y ejecuta la operación
         return AuditDecorator(service).execute()

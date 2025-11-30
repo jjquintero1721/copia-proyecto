@@ -104,3 +104,23 @@ class ConsultationRepository:
                 MedicalHistoryMemento.version == version
             )
         ).first()
+
+    def get_by_historia_clinica_id(
+            self,
+            historia_clinica_id: UUID
+    ) -> List[Consultation]:
+        """
+        Obtiene todas las consultas de una historia clínica ordenadas por fecha
+
+        Args:
+            historia_clinica_id: ID de la historia clínica
+
+        Returns:
+            Lista de consultas ordenadas de más antigua a más reciente
+        """
+        return (
+            self.db.query(Consultation)
+            .filter(Consultation.historia_clinica_id == historia_clinica_id)
+            .order_by(Consultation.fecha_hora.asc())
+            .all()
+        )

@@ -58,7 +58,8 @@ appointment_controller,
 inventory_controller,
 follow_up_controller,
 notification_settings_controller,
-dashboard_controller
+dashboard_controller,
+export_controller
 )
 
 # Registrar rutas
@@ -128,6 +129,12 @@ app.include_router(
     dashboard_controller.router,
     prefix="/api/v1/dashboard",
     tags=["Dashboard"]
+)
+
+app.include_router(
+    export_controller.router,
+    prefix="/api/v1/export",
+    tags=["Exportación"]
 )
 
 # Endpoint raíz
