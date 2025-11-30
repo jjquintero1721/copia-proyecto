@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from typing import List, Optional, Dict, Any
 from uuid import UUID
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 
 from app.database import get_db
 from app.services.appointment.appointment_service import AppointmentService
@@ -190,12 +190,19 @@ async def reschedule_appointment(
         appointment_id: UUID,
         update_data: AppointmentUpdate,
         db: Session = Depends(get_db),
-        current_user: User = Depends(require_staff)
+        current_user: User = Depends(get_current_active_user)
 ):
     """
     Reprograma una cita existente
     """
+
     try:
+
+        # Obtener la cita antes de reprogramar
+        appointment_service = AppointmentService(db)
+        appointment = appointment_service.get_appointment_by_id(appointment_id)
+        fecha_anterior = appointment.fecha_hora
+
         cmd = RescheduleAppointmentCommand(
             db=db,
             appointment_id=appointment_id,
@@ -204,6 +211,16 @@ async def reschedule_appointment(
         )
 
         result = cmd.execute()
+
+        # 📧 ENVIAR NOTIFICACIÓN
+        from app.services.notifications.notification_service import NotificationService
+        notifier = NotificationService(db)
+        notifier.send_appointment_reschedule_notification(
+            appointment_id=appointment_id,
+            fecha_anterior=fecha_anterior,
+            user_id=current_user.id
+        )
+
 
         return success_response(
             data=result,
@@ -237,6 +254,13 @@ async def confirm_appointment(
 
         result = cmd.execute()
 
+        from app.services.notifications.notification_service import NotificationService
+        notifier = NotificationService(db)
+        notifier.send_appointment_confirmation(
+            appointment_id=appointment_id,
+            user_id=current_user.id
+        )
+
         return success_response(
             data=result,
             message="Cita confirmada exitosamente"
@@ -258,16 +282,37 @@ async def confirm_appointment(
 async def cancel_appointment(
         appointment_id: UUID,
         db: Session = Depends(get_db),
-        current_user: User = Depends(require_staff)
+        motivo_cancelacion: str = Query(
+                    ...,
+                    min_length=5,
+                    max_length=300,
+                    description="Motivo de la cancelación"
+                ),
+        current_user: User = Depends(get_current_active_user)
 ):
     try:
         cmd = CancelAppointmentCommand(
             db=db,
             appointment_id=appointment_id,
+            motivo_cancelacion=motivo_cancelacion,
             usuario_id=current_user.id
         )
 
         result = cmd.execute()
+
+        appointment_service = AppointmentService(db)
+        appointment = appointment_service.get_appointment_by_id(appointment_id)
+
+        is_late = (appointment.fecha_hora - datetime.now(timezone.utc)).total_seconds() < 4 * 3600
+
+        # 📧 ENVIAR NOTIFICACIÓN
+        from app.services.notifications.notification_service import NotificationService
+        notifier = NotificationService(db)
+        notifier.send_appointment_cancellation_notification(
+            appointment_id=appointment_id,
+            cancelacion_tardia=is_late,
+            user_id=current_user.id
+        )
 
         return success_response(
             data=result,

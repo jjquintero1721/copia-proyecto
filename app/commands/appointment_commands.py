@@ -88,10 +88,12 @@ class CancelAppointmentCommand:
             self,
             db: Session,
             appointment_id: UUID,
+            motivo_cancelacion: str,
             usuario_id: Optional[UUID] = None
     ):
         self.db = db
         self.appointment_id = appointment_id
+        self.motivo_cancelacion = motivo_cancelacion
         self.usuario_id = usuario_id
 
     def execute(self):

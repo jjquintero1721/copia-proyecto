@@ -212,6 +212,23 @@ class UserService:
                     f"El correo {datos.correo} ya existe como propietario"
                 )
 
+        # ==================== NUEVA VALIDACIÓN ====================
+        # Validar veterinario encargado para auxiliares
+        if datos.rol == UserRoleEnum.AUXILIAR:
+            if not datos.veterinario_encargado_id:
+                raise ValueError("Los auxiliares deben tener un veterinario encargado asignado")
+
+            veterinario = self.user_repository.get_by_id(datos.veterinario_encargado_id)
+
+            if not veterinario:
+                raise ValueError(f"No se encontró el veterinario con ID {datos.veterinario_encargado_id}")
+
+            if veterinario.rol != UserRole.VETERINARIO:
+                raise ValueError("El encargado debe tener rol VETERINARIO")
+
+            if not veterinario.activo:
+                raise ValueError("El veterinario encargado debe estar activo")
+
     # ============================================================
     # 🔥 2. CREACIÓN ATÓMICA DE USUARIO Y PROPIETARIO
     # ============================================================
@@ -226,6 +243,10 @@ class UserService:
                 raise ValueError(f"Rol no válido: {user_data.rol}")
 
             user = factory.create_user(user_data, creado_por)
+
+            # Asignar veterinario encargado si es auxiliar
+            if user_data.rol == UserRoleEnum.AUXILIAR:
+                user.veterinario_encargado_id = user_data.veterinario_encargado_id
 
             self.db.add(user)
             self.db.commit()
@@ -325,6 +346,23 @@ class UserService:
         # Usar el repositorio para obtener usuarios
         return self.user_repository.get_by_rol(user_role, activo)
 
+    # ==================== NUEVO MÉTODO ====================
+    def get_auxiliares_by_veterinario(self, veterinario_id: UUID, activo: Optional[bool] = None) -> List[User]:
+        """Obtiene auxiliares de un veterinario"""
+        from sqlalchemy import and_
+
+        query = self.db.query(User).filter(
+            and_(
+                User.rol == UserRole.AUXILIAR,
+                User.veterinario_encargado_id == veterinario_id
+            )
+        )
+
+        if activo is not None:
+            query = query.filter(User.activo == activo)
+
+        return query.all()
+
     def update_user(self, user_id: UUID, user_data: UserUpdate):
         user = self.user_repository.get_by_id(user_id)
         if not user:
@@ -336,6 +374,24 @@ class UserService:
             user.telefono = user_data.telefono
         if user_data.activo is not None:
             user.activo = user_data.activo
+
+        # ==================== NUEVA VALIDACIÓN ====================
+        if user_data.veterinario_encargado_id is not None:
+            if user.rol != UserRole.AUXILIAR:
+                raise ValueError("Solo auxiliares pueden tener veterinario encargado")
+
+            veterinario = self.user_repository.get_by_id(user_data.veterinario_encargado_id)
+
+            if not veterinario:
+                raise ValueError(f"No se encontró el veterinario con ID {user_data.veterinario_encargado_id}")
+
+            if veterinario.rol != UserRole.VETERINARIO:
+                raise ValueError("El encargado debe tener rol VETERINARIO")
+
+            if not veterinario.activo:
+                raise ValueError("El veterinario encargado debe estar activo")
+
+            user.veterinario_encargado_id = user_data.veterinario_encargado_id
 
         user.fecha_actualizacion = datetime.now(timezone.utc)
         return self.user_repository.update(user)
@@ -357,5 +413,12 @@ class UserService:
         user = self.user_repository.get_by_id(user_id)
         if not user:
             raise ValueError(self.USER_NOT_FOUND_MSG)
+
+        # ==================== NUEVA VALIDACIÓN ====================
+        # Verificar auxiliares activos si es veterinario
+        if user.rol == UserRole.VETERINARIO:
+            auxiliares = self.get_auxiliares_by_veterinario(user_id, activo=True)
+            if auxiliares:
+                raise ValueError(f"No se puede desactivar. Tiene {len(auxiliares)} auxiliar(es) activo(s)")
 
         return self.user_repository.soft_delete(user)

@@ -4,7 +4,7 @@ Roles: superadmin, veterinario, auxiliar, propietario
 CORRECCIÓN ARQUITECTURAL: Relación 1:1 con Owner cuando rol=propietario
 """
 
-from sqlalchemy import Column, String, Boolean, DateTime, Enum as SQLEnum
+from sqlalchemy import Column, String, Boolean, DateTime, Enum as SQLEnum, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from datetime import datetime, timezone
@@ -46,6 +46,14 @@ class User(Base):
     rol = Column(SQLEnum(UserRole), nullable=False)
     activo = Column(Boolean, default=True, nullable=False)
 
+    veterinario_encargado_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("usuarios.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+        comment="ID del veterinario encargado de este auxiliar (solo si rol=auxiliar)"
+    )
+
     # Auditoría
     fecha_creacion = Column(
         DateTime,
@@ -64,6 +72,23 @@ class User(Base):
         "Owner",
         back_populates="usuario",
         uselist=False,
+        cascade="all, delete-orphan"
+    )
+
+    # Relación N:1 - Auxiliar pertenece a un Veterinario
+    veterinario_encargado = relationship(
+        "User",
+        remote_side=[id],
+        foreign_keys=[veterinario_encargado_id],
+        back_populates="auxiliares_a_cargo",
+        uselist=False
+    )
+
+    # Relación 1:N - Veterinario tiene muchos auxiliares
+    auxiliares_a_cargo = relationship(
+        "User",
+        foreign_keys=[veterinario_encargado_id],
+        back_populates="veterinario_encargado",
         cascade="all, delete-orphan"
     )
 
@@ -86,5 +111,25 @@ class User(Base):
         if self.propietario:
             user_dict["propietario_id"] = str(self.propietario.id)
             user_dict["documento"] = self.propietario.documento
+
+            # Incluir info del veterinario encargado si el usuario es auxiliar
+            if self.rol == UserRole.AUXILIAR and self.veterinario_encargado:
+                user_dict["veterinario_encargado"] = {
+                    "id": str(self.veterinario_encargado.id),
+                    "nombre": self.veterinario_encargado.nombre,
+                    "correo": self.veterinario_encargado.correo
+                }
+
+            # Incluir lista de auxiliares si el usuario es veterinario
+            if self.rol == UserRole.VETERINARIO and self.auxiliares_a_cargo:
+                user_dict["auxiliares_a_cargo"] = [
+                    {
+                        "id": str(aux.id),
+                        "nombre": aux.nombre,
+                        "correo": aux.correo,
+                        "activo": aux.activo
+                    }
+                    for aux in self.auxiliares_a_cargo
+                ]
 
         return user_dict

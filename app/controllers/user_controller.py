@@ -360,3 +360,125 @@ async def deactivate_user(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error al desactivar usuario: {str(exc)}"
         )
+
+
+# ==================== NUEVOS ENDPOINTS ====================
+
+@router.get("/veterinario/{veterinario_id}/auxiliares", response_model=dict)
+async def get_auxiliares_by_veterinario(
+        veterinario_id: UUID,
+        activo: Optional[bool] = Query(None, description="Filtrar por estado activo"),
+        db: Session = Depends(get_db),
+        current_user: User = Depends(require_staff)
+):
+    """
+    Obtiene auxiliares asignados a un veterinario
+
+    **Requiere:** Token JWT válido
+    **Acceso:** Superadmin, Veterinario (solo sus propios auxiliares)
+    """
+    try:
+        service = UserService(db)
+        veterinario = service.get_user_by_id(veterinario_id)
+
+        if not veterinario:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Veterinario no encontrado"
+            )
+
+        if veterinario.rol.value != "veterinario":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="El usuario no es veterinario"
+            )
+
+        # Veterinario solo puede ver sus propios auxiliares
+        if current_user.rol.value == "veterinario" and str(current_user.id) != str(veterinario_id):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Solo puedes consultar tus propios auxiliares"
+            )
+
+        auxiliares = service.get_auxiliares_by_veterinario(veterinario_id, activo)
+
+        return success_response(
+            data={
+                "total": len(auxiliares),
+                "auxiliares": [aux.to_dict() for aux in auxiliares]
+            },
+            message="Auxiliares del veterinario"
+        )
+
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(exc)
+        )
+
+
+@router.get("/me/auxiliares", response_model=dict)
+async def get_my_auxiliares(
+        activo: Optional[bool] = Query(None, description="Filtrar por estado activo"),
+        db: Session = Depends(get_db),
+        current_user: User = Depends(get_current_active_user)
+):
+    """
+    Obtiene auxiliares del veterinario autenticado
+
+    **Requiere:** Token JWT válido
+    **Acceso:** Solo Veterinario
+    """
+    if current_user.rol.value != "veterinario":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Solo los veterinarios pueden usar este endpoint"
+        )
+
+    try:
+        service = UserService(db)
+        auxiliares = service.get_auxiliares_by_veterinario(current_user.id, activo)
+
+        return success_response(
+            data={
+                "total": len(auxiliares),
+                "auxiliares": [aux.to_dict() for aux in auxiliares]
+            },
+            message="Tus auxiliares"
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(exc)
+        )
+
+
+@router.get("/me/veterinario-encargado", response_model=dict)
+async def get_my_veterinario(
+        db: Session = Depends(get_db),
+        current_user: User = Depends(get_current_active_user)
+):
+    """
+    Obtiene el veterinario encargado del auxiliar autenticado
+
+    **Requiere:** Token JWT válido
+    **Acceso:** Solo Auxiliar
+    """
+    if current_user.rol.value != "auxiliar":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Solo los auxiliares pueden usar este endpoint"
+        )
+
+    if not current_user.veterinario_encargado:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No tienes veterinario encargado asignado"
+        )
+
+    return success_response(
+        data=current_user.veterinario_encargado.to_dict(),
+        message="Tu veterinario encargado"
+    )

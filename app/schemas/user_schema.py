@@ -5,8 +5,8 @@ RF-02: Gestión de usuarios internos
 CORRECCIÓN ARQUITECTURAL: Incluye documento para propietarios
 """
 
-from pydantic import BaseModel, EmailStr, Field
-from typing import Optional
+from pydantic import BaseModel, EmailStr, Field, field_validator
+from typing import Optional, List
 from uuid import UUID
 from datetime import datetime
 from enum import Enum
@@ -44,6 +44,61 @@ class UserCreate(BaseModel):
         description="Documento de identidad (requerido para propietarios)"
     )
 
+    veterinario_encargado_id: Optional[UUID] = Field(
+        None,
+        description="ID del veterinario encargado (requerido para auxiliares)"
+    )
+
+    @field_validator('veterinario_encargado_id')
+    @classmethod
+    def validar_veterinario_encargado(cls, v, info):
+        """
+        Valida que si el rol es AUXILIAR, se proporcione un veterinario_encargado_id
+        """
+        rol = info.data.get('rol')
+
+        # Si el rol es AUXILIAR, el veterinario_encargado_id es obligatorio
+        if rol == UserRoleEnum.AUXILIAR and v is None:
+            raise ValueError(
+                "El campo 'veterinario_encargado_id' es obligatorio para usuarios con rol AUXILIAR"
+            )
+
+        # Si el rol NO es AUXILIAR, no debe tener veterinario_encargado_id
+        if rol != UserRoleEnum.AUXILIAR and v is not None:
+            raise ValueError(
+                "El campo 'veterinario_encargado_id' solo aplica para usuarios con rol AUXILIAR"
+            )
+
+        return v
+
+
+# ==================== SCHEMA AUXILIAR: INFO VETERINARIO ====================
+class VeterinarioSimple(BaseModel):
+    """
+    Representación simplificada de un veterinario
+    (usado en la respuesta de auxiliares)
+    """
+    id: UUID
+    nombre: str
+    correo: EmailStr
+
+    class Config:
+        from_attributes = True
+
+
+# ==================== SCHEMA AUXILIAR: INFO AUXILIAR ====================
+class AuxiliarSimple(BaseModel):
+    """
+    Representación simplificada de un auxiliar
+    (usado en la respuesta de veterinarios)
+    """
+    id: UUID
+    nombre: str
+    correo: EmailStr
+    activo: bool
+
+    class Config:
+        from_attributes = True
 
 # ==================== SCHEMA DE SALIDA: RESPUESTA USUARIO ====================
 class UserResponse(BaseModel):
@@ -63,6 +118,18 @@ class UserResponse(BaseModel):
     propietario_id: Optional[UUID] = None
     documento: Optional[str] = None
 
+    # Solo para auxiliares
+    veterinario_encargado: Optional[VeterinarioSimple] = Field(
+        None,
+        description="Información del veterinario encargado (solo para auxiliares)"
+    )
+
+    # Solo para veterinarios
+    auxiliares_a_cargo: Optional[List[AuxiliarSimple]] = Field(
+        None,
+        description="Lista de auxiliares supervisados (solo para veterinarios)"
+    )
+
     class Config:
         from_attributes = True
 
@@ -73,7 +140,10 @@ class UserUpdate(BaseModel):
     nombre: Optional[str] = Field(None, min_length=3, max_length=100)
     telefono: Optional[str] = Field(None, max_length=20)
     activo: Optional[bool] = None
-
+    veterinario_encargado_id: Optional[UUID] = Field(
+        None,
+        description="ID del veterinario encargado (solo para auxiliares)"
+    )
 
 # ==================== SCHEMA DE CAMBIO DE CONTRASEÑA ====================
 class UserChangePassword(BaseModel):

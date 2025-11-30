@@ -1,18 +1,9 @@
 """
-Sistema de Plantillas HTML para Correos Electrónicos
-RF-06: Notificaciones por correo
-Patrón de diseño: Template Method, Strategy
-
-Propósito:
-Proporcionar plantillas HTML profesionales y responsivas para:
-- Confirmación de citas
-- Recordatorios de citas (24h antes)
-- Notificaciones de reprogramación
-- Notificaciones de cancelación
-- Bienvenida de nuevos usuarios
-
-Principio DRY: No repetir código HTML
-Principio SRP: Cada plantilla tiene una responsabilidad única
+Sistema de Plantillas HTML para Correos Electrónicos (Minimalista Cute - SVG inline)
+- Mantiene compatibilidad con implementaciones previas.
+- Reemplaza emojis por SVG inline (Gmail-safe).
+- Mejora compatibilidad visual: botones y badges consistentes.
+- No cambia nombres de clases/funciones ni la factory get_email_template.
 """
 
 from typing import Dict, Any, Optional
@@ -20,10 +11,60 @@ from datetime import datetime
 from abc import ABC, abstractmethod
 
 
+def _svg_huellita(size: int = 28, fill: str = "#2563eb") -> str:
+    """SVG minimalista de huella (mascota)"""
+    return f"""
+    <svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" style="display:inline-block; vertical-align:middle;">
+      <path d="M7.5 6.5C8.328 6.5 9 5.828 9 5s-.672-1.5-1.5-1.5S6 4.172 6 5s.672 1.5 1.5 1.5z" fill="{fill}"/>
+      <path d="M11.5 4.5C12.328 4.5 13 3.828 13 3s-.672-1.5-1.5-1.5S10 2.172 10 3s.672 1.5 1.5 1.5z" fill="{fill}"/>
+      <path d="M16.5 6.5C17.328 6.5 18 5.828 18 5s-.672-1.5-1.5-1.5S15 4.172 15 5s.672 1.5 1.5 1.5z" fill="{fill}"/>
+      <path d="M12 13.5c-1.657 0-3 1.567-3 3.5 0 1.933 1.343 3.5 3 3.5s3-1.567 3-3.5c0-1.933-1.343-3.5-3-3.5z" fill="{fill}"/>
+    </svg>
+    """
+
+
+def _svg_estetoscopio(size: int = 18, fill: str = "#2563eb") -> str:
+    return f"""
+    <svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" style="display:inline-block; vertical-align:middle;">
+      <path d="M20 6a2 2 0 0 0-2 2v3a4 4 0 1 1-8 0V8" stroke="{fill}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
+      <path d="M6 18v2a2 2 0 0 0 2 2h0" stroke="{fill}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+      <circle cx="19" cy="7" r="1.6" fill="{fill}"/>
+    </svg>
+    """
+
+
+def _svg_calendario(size: int = 18, fill: str = "#2563eb") -> str:
+    return f"""
+    <svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" style="display:inline-block; vertical-align:middle;">
+      <rect x="3" y="5" width="18" height="16" rx="2" stroke="{fill}" stroke-width="1.6" fill="none"/>
+      <path d="M16 3v4M8 3v4" stroke="{fill}" stroke-width="1.6" stroke-linecap="round"/>
+      <path d="M3 11h18" stroke="{fill}" stroke-width="1.6" stroke-linecap="round"/>
+    </svg>
+    """
+
+
+def _svg_check(size: int = 20, fill: str = "#10b981") -> str:
+    return f"""
+    <svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" style="display:inline-block; vertical-align:middle;">
+      <circle cx="12" cy="12" r="10" fill="{fill}" />
+      <path d="M9 12.5l1.8 1.8L15 10" stroke="#ffffff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+    </svg>
+    """
+
+
+def _svg_x(size: int = 20, fill: str = "#ef4444") -> str:
+    return f"""
+    <svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" style="display:inline-block; vertical-align:middle;">
+      <circle cx="12" cy="12" r="10" fill="{fill}" />
+      <path d="M8 8l8 8M16 8l-8 8" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    """
+
+
 class EmailTemplate(ABC):
     """
-    Clase abstracta para plantillas de correo
-    Patrón Template Method
+    Clase abstracta para plantillas de correo (Template Method)
+    Mantiene la misma API que antes: get_subject, get_body, render, _generate_text_version.
     """
 
     def __init__(self):
@@ -37,129 +78,95 @@ class EmailTemplate(ABC):
 
     @abstractmethod
     def get_subject(self, context: Dict[str, Any]) -> str:
-        """Retorna el asunto del correo"""
         pass
 
     @abstractmethod
     def get_body(self, context: Dict[str, Any]) -> str:
-        """Retorna el cuerpo HTML del correo"""
         pass
 
     def render(self, context: Dict[str, Any]) -> Dict[str, str]:
         """
-        Renderiza la plantilla completa
-        Template Method: Define el esqueleto del algoritmo
+        Retorna dict con keys: subject, body_html, body_text
         """
+        subject = self.get_subject(context)
+        body_html = self._wrap_in_layout(self.get_body(context))
+        body_text = self._generate_text_version(context)
         return {
-            "subject": self.get_subject(context),
-            "body_html": self._wrap_in_layout(self.get_body(context)),
-            "body_text": self._generate_text_version(context)
+            "subject": subject,
+            "body_html": body_html,
+            "body_text": body_text
         }
 
     def _wrap_in_layout(self, content: str) -> str:
         """
-        Envuelve el contenido en el layout base
-        Principio DRY: Layout común para todos los correos
+        Layout principal para todas las plantillas.
+        Mantengo estilos en head y también uso estilos inline en elementos clave
+        para mejorar compatibilidad en clientes como Gmail.
         """
-        return f"""
-<!DOCTYPE html>
+        return f"""<!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{self.brand_name}</title>
-    <style>
-        body {{
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            line-height: 1.6;
-            color: #333333;
-            background-color: #f4f4f4;
-            margin: 0;
-            padding: 0;
-        }}
-        .container {{
-            max-width: 600px;
-            margin: 20px auto;
-            background-color: #ffffff;
-            border-radius: 8px;
-            overflow: hidden;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-        }}
-        .header {{
-            background-color: {self.brand_color};
-            color: #ffffff;
-            padding: 30px 20px;
-            text-align: center;
-        }}
-        .header h1 {{
-            margin: 0;
-            font-size: 24px;
-        }}
-        .content {{
-            padding: 30px 20px;
-        }}
-        .button {{
-            display: inline-block;
-            padding: 12px 30px;
-            background-color: {self.brand_color};
-            color: #ffffff;
-            text-decoration: none;
-            border-radius: 5px;
-            margin: 20px 0;
-            font-weight: bold;
-        }}
-        .info-box {{
-            background-color: #f8f9fa;
-            border-left: 4px solid {self.brand_color};
-            padding: 15px;
-            margin: 20px 0;
-        }}
-        .footer {{
-            background-color: #f8f9fa;
-            padding: 20px;
-            text-align: center;
-            font-size: 12px;
-            color: #666666;
-        }}
-        .footer a {{
-            color: {self.brand_color};
-            text-decoration: none;
-        }}
-    </style>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>{self.brand_name}</title>
+<style>
+  body,html {{ margin:0; padding:0; width:100%; background:#f6f8fb; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color:#333; }}
+  .email-wrapper {{ width:100%; padding:24px 0; display:flex; justify-content:center; }}
+  .email-card {{ width:100%; max-width:640px; background:#fff; border-radius:12px; box-shadow:0 6px 20px rgba(16,24,40,0.06); overflow:hidden; }}
+  .header {{ background: {self.brand_color}; color:#fff; padding:20px 24px; text-align:center; }}
+  .brand-title {{ font-size:20px; font-weight:700; margin:0; }}
+  .subhead {{ font-size:13px; opacity:0.95; margin-top:6px; }}
+
+  .content {{ padding:22px 24px; font-size:15px; line-height:1.6; color:#444; }}
+  .hero {{ display:flex; align-items:center; gap:14px; margin-bottom:14px; }}
+  .badge {{ width:56px; height:56px; border-radius:12px; display:flex; align-items:center; justify-content:center; background:#f3f6fb; }}
+
+  .info-box {{ background:#f8fafc; border-left:4px solid {self.brand_color}; padding:14px; margin:14px 0; border-radius:8px; }}
+  .info-row {{ display:flex; gap:10px; align-items:center; margin:8px 0; font-size:14px; color:#111827; }}
+  .muted {{ color:#6b7280; font-size:13px; }}
+
+  .cta {{ display:inline-block; padding:10px 16px; border-radius:8px; text-decoration:none; color:#fff; background:{self.brand_color}; font-weight:600; }}
+
+  .footer {{ background:#f3f4f6; padding:16px 18px; text-align:center; font-size:13px; color:#6b7280; }}
+
+  @media (max-width:480px) {{
+    .content {{ padding:18px; font-size:15px; }}
+    .header {{ padding:18px; }}
+  }}
+</style>
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <h1>🏥 {self.brand_name}</h1>
-        </div>
-        <div class="content">
-            {content}
-        </div>
-        <div class="footer">
-            <p>
-                <strong>{self.brand_name}</strong><br>
-                📧 {self.support_email} | 📞 {self.phone_number}
-            </p>
-            <p>
-                Este correo fue enviado automáticamente. Por favor no responder.<br>
-                Si necesitas ayuda, contáctanos en {self.support_email}
-            </p>
-        </div>
+  <div class="email-wrapper">
+    <div class="email-card">
+      <div class="header" style="background:{self.brand_color};">
+        <div class="brand-title">🏥 {self.brand_name}</div>
+        <div class="subhead" style="margin-top:6px; font-size:13px;">Cuidado con cariño · {self.support_email}</div>
+      </div>
+
+      <div class="content">
+        {content}
+      </div>
+
+      <div class="footer">
+        <p style="margin:0;">{self.brand_name} · <a href="mailto:{self.support_email}" style="color:{self.brand_color}; text-decoration:none;">{self.support_email}</a></p>
+        <p class="muted" style="margin:6px 0 0 0;">Teléfono: {self.phone_number} · Este correo es automático. No respondas directamente.</p>
+      </div>
     </div>
+  </div>
 </body>
-</html>
-"""
+</html>"""
 
     @abstractmethod
     def _generate_text_version(self, context: Dict[str, Any]) -> str:
-        """Genera versión en texto plano del correo"""
         pass
+
+
+# -------------------- Plantillas específicas --------------------
 
 
 class AppointmentConfirmationTemplate(EmailTemplate):
     """
-    Plantilla para confirmación de cita agendada
-    RF-06: Confirmación de cita
+    Plantilla para confirmación de cita agendada (SVG minimalista)
     """
 
     def get_subject(self, context: Dict[str, Any]) -> str:
@@ -170,104 +177,47 @@ class AppointmentConfirmationTemplate(EmailTemplate):
         propietario_nombre = context.get("propietario_nombre", "Cliente")
         fecha_hora = context.get("fecha_hora", "")
         servicio_nombre = context.get("servicio_nombre", "Consulta")
-        veterinario_nombre = context.get("veterinario_nombre", self.MSG_MASCOTA)
+        veterinario_nombre = context.get("veterinario_nombre", self.MSG_DOCTORA)
 
+        # Badge con SVG check minimalista + contenido con íconos SVG inline
         return f"""
-            <h2>¡Cita confirmada exitosamente! 🎉</h2>
-            <p>Hola <strong>{propietario_nombre}</strong>,</p>
-            <p>
-                Tu cita para <strong>{mascota_nombre}</strong> ha sido agendada correctamente.
-            </p>
+          <div class="hero" style="margin-bottom:16px;">
+            <div class="badge" style="background:#e6f7ef;">
+              {_svg_check(size=32, fill='#10b981')}
+            </div>
+            <div>
+              <h2 style="margin:0 0 6px 0; font-size:18px;">¡Tu cita está confirmada!</h2>
+              <p class="muted" style="margin:0;">Gracias por confiar en nosotros, <strong>{propietario_nombre}</strong>.</p>
+            </div>
+          </div>
 
-            <div class="info-box">
-                <h3>📋 Detalles de la cita:</h3>
-                <p><strong>🐾 Mascota:</strong> {mascota_nombre}</p>
-                <p><strong>🩺 Servicio:</strong> {servicio_nombre}</p>
-                <p><strong>👨‍⚕️ Veterinario:</strong> {veterinario_nombre}</p>
-                <p><strong>📅 Fecha y hora:</strong> {fecha_hora}</p>
+          <div class="info-box" style="margin-top:6px;">
+            <h3 style="margin:0 0 8px 0; font-size:15px;">Detalles de la cita</h3>
+
+            <div class="info-row" style="margin-top:10px;">
+              {_svg_huellita(size=18, fill='#2563eb')}
+              <div style="font-size:14px;"><strong>Mascota:</strong>&nbsp;{mascota_nombre}</div>
             </div>
 
-            <p>
-                <strong>Importante:</strong> Por favor llega 10 minutos antes de tu cita.
-                Si necesitas cancelar o reprogramar, hazlo con al menos 4 horas de anticipación.
-            </p>
-
-            <p>¡Esperamos verte pronto! 🏥</p>
-        """
-
-    def _generate_text_version(self, context: Dict[str, Any]) -> str:
-        mascota_nombre = context.get("mascota_nombre", self.MSG_MASCOTA)
-        propietario_nombre = context.get("propietario_nombre", "Cliente")
-        fecha_hora = context.get("fecha_hora", "")
-        servicio_nombre = context.get("servicio_nombre", "Consulta")
-        veterinario_nombre = context.get("veterinario_nombre", self.MSG_MASCOTA)
-
-        return f"""
-¡Cita confirmada exitosamente!
-
-Hola {propietario_nombre},
-
-Tu cita para {mascota_nombre} ha sido agendada correctamente.
-
-DETALLES DE LA CITA:
-- Mascota: {mascota_nombre}
-- Servicio: {servicio_nombre}
-- Veterinario: {veterinario_nombre}
-- Fecha y hora: {fecha_hora}
-
-Importante: Por favor llega 10 minutos antes de tu cita.
-
-{self.brand_name}
-{self.support_email} | {self.phone_number}
-"""
-
-
-class AppointmentReminderTemplate(EmailTemplate):
-    """
-    Plantilla para recordatorio de cita (24h antes)
-    RF-06: Recordatorios 24h antes
-    """
-
-    def get_subject(self, context: Dict[str, Any]) -> str:
-        return f"🔔 Recordatorio de cita mañana - {context.get('mascota_nombre', 'Mascota')}"
-
-    def get_body(self, context: Dict[str, Any]) -> str:
-        mascota_nombre = context.get("mascota_nombre", self.MSG_MASCOTA)
-        propietario_nombre = context.get("propietario_nombre", "Cliente")
-        fecha_hora = context.get("fecha_hora", "")
-        servicio_nombre = context.get("servicio_nombre", "Consulta")
-        veterinario_nombre = context.get("veterinario_nombre", self.MSG_MASCOTA)
-
-        return f"""
-            <h2>🔔 Recordatorio: Cita mañana</h2>
-            <p>Hola <strong>{propietario_nombre}</strong>,</p>
-            <p>
-                Te recordamos que mañana tienes una cita programada para
-                <strong>{mascota_nombre}</strong>.
-            </p>
-
-            <div class="info-box">
-                <h3>📋 Detalles de la cita:</h3>
-                <p><strong>🐾 Mascota:</strong> {mascota_nombre}</p>
-                <p><strong>🩺 Servicio:</strong> {servicio_nombre}</p>
-                <p><strong>👨‍⚕️ Veterinario:</strong> {veterinario_nombre}</p>
-                <p><strong>📅 Fecha y hora:</strong> {fecha_hora}</p>
+            <div class="info-row">
+              {_svg_estetoscopio(size=18, fill='#2563eb')}
+              <div style="font-size:14px;"><strong>Servicio:</strong>&nbsp;{servicio_nombre}</div>
             </div>
 
-            <p>
-                <strong>Recomendaciones antes de la cita:</strong>
-            </p>
-            <ul>
-                <li>Llega 10 minutos antes</li>
-                <li>Trae la cartilla de vacunación (si aplica)</li>
-                <li>Si tu mascota requiere ayuno, no la alimentes 8 horas antes</li>
-            </ul>
+            <div class="info-row">
+              <span style="width:18px;height:18px;display:inline-block;vertical-align:middle;">{_svg_huellita(size=0)}</span>
+              <div style="font-size:14px;"><strong>Veterinario:</strong>&nbsp;{veterinario_nombre}</div>
+            </div>
 
-            <p>
-                Si necesitas cancelar o reprogramar, por favor hazlo con anticipación.
-            </p>
+            <div class="info-row">
+              {_svg_calendario(size=18, fill='#2563eb')}
+              <div style="font-size:14px;"><strong>Fecha y hora:</strong>&nbsp;{fecha_hora}</div>
+            </div>
+          </div>
 
-            <p>¡Te esperamos! 🏥</p>
+          <p style="margin-top:12px; color:#374151;">Por favor llega 10 minutos antes. Si necesitas cambiar la cita, puedes hacerlo desde tu cuenta o contactarnos.</p>
+
+          <a href="#" class="cta" style="display:inline-block; margin-top:10px;">Ver cita</a>
         """
 
     def _generate_text_version(self, context: Dict[str, Any]) -> str:
@@ -277,25 +227,102 @@ class AppointmentReminderTemplate(EmailTemplate):
         servicio_nombre = context.get("servicio_nombre", "Consulta")
         veterinario_nombre = context.get("veterinario_nombre", self.MSG_DOCTORA)
 
-        return f"""
-RECORDATORIO: Cita mañana
+        return f"""¡Tu cita está confirmada!
 
 Hola {propietario_nombre},
 
-Te recordamos que mañana tienes una cita programada para {mascota_nombre}.
+Tu cita para {mascota_nombre} ha sido confirmada.
 
-DETALLES DE LA CITA:
+DETALLES:
 - Mascota: {mascota_nombre}
 - Servicio: {servicio_nombre}
 - Veterinario: {veterinario_nombre}
 - Fecha y hora: {fecha_hora}
 
-RECOMENDACIONES:
-- Llega 10 minutos antes
-- Trae la cartilla de vacunación (si aplica)
-- Si tu mascota requiere ayuno, no la alimentes 8 horas antes
+Por favor llega 10 minutos antes.
 
-¡Te esperamos!
+{self.brand_name}
+{self.support_email} | {self.phone_number}
+"""
+
+
+class AppointmentReminderTemplate(EmailTemplate):
+    """
+    Recordatorio 24h antes (SVG minimalista)
+    """
+
+    def get_subject(self, context: Dict[str, Any]) -> str:
+        return f"🔔 Recordatorio: tu cita es mañana - {context.get('mascota_nombre', 'Mascota')}"
+
+    def get_body(self, context: Dict[str, Any]) -> str:
+        mascota_nombre = context.get("mascota_nombre", self.MSG_MASCOTA)
+        propietario_nombre = context.get("propietario_nombre", "Cliente")
+        fecha_hora = context.get("fecha_hora", "")
+        servicio_nombre = context.get("servicio_nombre", "Consulta")
+        veterinario_nombre = context.get("veterinario_nombre", self.MSG_DOCTORA)
+
+        return f"""
+          <div class="hero" style="margin-bottom:12px;">
+            <div class="badge" style="background:#fff7ed;">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <path d="M12 6v6l4 2" stroke="#f59e0b" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+                <circle cx="12" cy="12" r="9" stroke="#f59e0b" stroke-width="1.6" fill="none"/>
+              </svg>
+            </div>
+            <div>
+              <h2 style="margin:0 0 6px 0; font-size:18px;">Recordatorio: Cita mañana</h2>
+              <p class="muted" style="margin:0;">Hola <strong>{propietario_nombre}</strong>, te esperamos mañana.</p>
+            </div>
+          </div>
+
+          <div class="info-box">
+            <h3 style="margin:0 0 8px 0; font-size:15px;">Detalles</h3>
+
+            <div class="info-row" style="margin-top:10px;">
+              {_svg_huellita(size=18, fill='#2563eb')}
+              <div style="font-size:14px;"><strong>Mascota:</strong>&nbsp;{mascota_nombre}</div>
+            </div>
+
+            <div class="info-row">
+              {_svg_estetoscopio(size=18, fill='#2563eb')}
+              <div style="font-size:14px;"><strong>Servicio:</strong>&nbsp;{servicio_nombre}</div>
+            </div>
+
+            <div class="info-row">
+              {_svg_calendario(size=18, fill='#2563eb')}
+              <div style="font-size:14px;"><strong>Fecha y hora:</strong>&nbsp;{fecha_hora}</div>
+            </div>
+          </div>
+
+          <p style="margin-top:10px;"><strong>Recomendaciones:</strong></p>
+          <ul style="margin-top:6px; padding-left:18px;">
+            <li>Llega 10 minutos antes</li>
+            <li>Trae cartilla de vacunación si aplica</li>
+            <li>Si requiere ayuno, no alimentes 8 horas antes</li>
+          </ul>
+
+          <a href="#" class="cta" style="display:inline-block; margin-top:10px;">Ver instrucciones</a>
+        """
+
+    def _generate_text_version(self, context: Dict[str, Any]) -> str:
+        mascota_nombre = context.get("mascota_nombre", self.MSG_MASCOTA)
+        propietario_nombre = context.get("propietario_nombre", "Cliente")
+        fecha_hora = context.get("fecha_hora", "")
+
+        return f"""Recordatorio: Cita mañana
+
+Hola {propietario_nombre},
+
+Te recordamos la cita de {mascota_nombre}.
+
+DETALLES:
+- Mascota: {mascota_nombre}
+- Fecha y hora: {fecha_hora}
+
+Recomendaciones:
+- Llega 10 minutos antes
+- Trae cartilla de vacunación si aplica
+- Si requiere ayuno, no alimentes 8 horas antes
 
 {self.brand_name}
 {self.support_email} | {self.phone_number}
@@ -304,8 +331,7 @@ RECOMENDACIONES:
 
 class AppointmentRescheduleTemplate(EmailTemplate):
     """
-    Plantilla para notificación de reprogramación de cita
-    RF-06: Notificación de reprogramación
+    Notificación de reprogramación (SVG minimalista)
     """
 
     def get_subject(self, context: Dict[str, Any]) -> str:
@@ -319,26 +345,41 @@ class AppointmentRescheduleTemplate(EmailTemplate):
         servicio_nombre = context.get("servicio_nombre", "Consulta")
 
         return f"""
-            <h2>🔄 Tu cita ha sido reprogramada</h2>
-            <p>Hola <strong>{propietario_nombre}</strong>,</p>
-            <p>
-                La cita de <strong>{mascota_nombre}</strong> ha sido reprogramada.
-            </p>
+          <div class="hero" style="margin-bottom:12px;">
+            <div class="badge" style="background:#eef2ff;">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <path d="M21 12a9 9 0 1 0-2.6 6.02L21 21" stroke="#7c3aed" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M21 7v5h-5" stroke="#7c3aed" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </div>
+            <div>
+              <h2 style="margin:0 0 6px 0; font-size:18px;">Cita reprogramada</h2>
+              <p class="muted" style="margin:0;">Hola <strong>{propietario_nombre}</strong>, hemos modificado tu cita.</p>
+            </div>
+          </div>
 
-            <div class="info-box">
-                <h3>📋 Nueva información:</h3>
-                <p><strong>🐾 Mascota:</strong> {mascota_nombre}</p>
-                <p><strong>🩺 Servicio:</strong> {servicio_nombre}</p>
-                <p><strong>📅 Fecha anterior:</strong> <s>{fecha_anterior}</s></p>
-                <p><strong>📅 Nueva fecha:</strong> {fecha_nueva}</p>
+          <div class="info-box">
+            <h3 style="margin:0 0 8px 0; font-size:15px;">Nueva información</h3>
+
+            <div class="info-row" style="margin-top:10px;">
+              {_svg_huellita(size=18, fill='#2563eb')}
+              <div style="font-size:14px;"><strong>Mascota:</strong>&nbsp;{mascota_nombre}</div>
             </div>
 
-            <p>
-                Por favor confirma que puedes asistir en el nuevo horario.
-                Si tienes alguna pregunta, no dudes en contactarnos.
-            </p>
+            <div class="info-row">
+              {_svg_calendario(size=18, fill='#2563eb')}
+              <div style="font-size:14px;"><strong>Fecha anterior:</strong>&nbsp;<s>{fecha_anterior}</s></div>
+            </div>
 
-            <p>¡Gracias por tu comprensión! 🏥</p>
+            <div class="info-row">
+              {_svg_calendario(size=18, fill='#2563eb')}
+              <div style="font-size:14px;"><strong>Nueva fecha:</strong>&nbsp;{fecha_nueva}</div>
+            </div>
+          </div>
+
+          <p style="margin-top:10px;">Por favor confirma que puedes asistir en el nuevo horario. Si necesitas ayuda, contáctanos.</p>
+
+          <a href="#" class="cta" style="display:inline-block; margin-top:10px;">Confirmar asistencia</a>
         """
 
     def _generate_text_version(self, context: Dict[str, Any]) -> str:
@@ -347,8 +388,7 @@ class AppointmentRescheduleTemplate(EmailTemplate):
         fecha_anterior = context.get("fecha_anterior", "")
         fecha_nueva = context.get("fecha_nueva", "")
 
-        return f"""
-TU CITA HA SIDO REPROGRAMADA
+        return f"""Tu cita ha sido reprogramada
 
 Hola {propietario_nombre},
 
@@ -366,8 +406,7 @@ Por favor confirma que puedes asistir en el nuevo horario.
 
 class AppointmentCancellationTemplate(EmailTemplate):
     """
-    Plantilla para notificación de cancelación de cita
-    RF-06: Notificación de cancelación
+    Notificación de cancelación (SVG minimalista)
     """
 
     def get_subject(self, context: Dict[str, Any]) -> str:
@@ -382,34 +421,39 @@ class AppointmentCancellationTemplate(EmailTemplate):
         warning_html = ""
         if cancelacion_tardia:
             warning_html = """
-                <div style="background-color: #fef2f2; border-left: 4px solid #dc2626; padding: 15px; margin: 20px 0;">
-                    <p><strong>⚠️ Cancelación tardía:</strong></p>
-                    <p>
-                        Esta cita fue cancelada con menos de 4 horas de anticipación.
-                        Te recordamos la importancia de cancelar con anticipación.
-                    </p>
-                </div>
+              <div style="background:#fff1f2; border-left:4px solid #ef4444; padding:12px; margin:12px 0; border-radius:6px;">
+                <p style="margin:0; color:#7f1d1d;"><strong>⚠️ Cancelación tardía:</strong> Esta cancelación ocurrió con menos de 4 horas de anticipación.</p>
+              </div>
             """
 
         return f"""
-            <h2>❌ Cita cancelada</h2>
-            <p>Hola <strong>{propietario_nombre}</strong>,</p>
-            <p>
-                La cita de <strong>{mascota_nombre}</strong> ha sido cancelada.
-            </p>
+          <div class="hero" style="margin-bottom:12px;">
+            <div class="badge" style="background:#fff1f0;">
+              {_svg_x(size=32, fill='#ef4444')}
+            </div>
+            <div>
+              <h2 style="margin:0 0 6px 0; font-size:18px;">Cita cancelada</h2>
+              <p class="muted" style="margin:0;">Hola <strong>{propietario_nombre}</strong>, la cita ha sido cancelada.</p>
+            </div>
+          </div>
 
-            <div class="info-box">
-                <p><strong>🐾 Mascota:</strong> {mascota_nombre}</p>
-                <p><strong>📅 Fecha cancelada:</strong> {fecha_hora}</p>
+          <div class="info-box">
+            <div class="info-row" style="margin-top:6px;">
+              {_svg_huellita(size=18, fill='#2563eb')}
+              <div style="font-size:14px;"><strong>Mascota:</strong>&nbsp;{mascota_nombre}</div>
             </div>
 
-            {warning_html}
+            <div class="info-row">
+              {_svg_calendario(size=18, fill='#2563eb')}
+              <div style="font-size:14px;"><strong>Fecha cancelada:</strong>&nbsp;{fecha_hora}</div>
+            </div>
+          </div>
 
-            <p>
-                Si deseas agendar una nueva cita, puedes contactarnos en cualquier momento.
-            </p>
+          {warning_html}
 
-            <p>¡Esperamos verte pronto! 🏥</p>
+          <p style="margin-top:10px;">Si deseas agendar una nueva cita, estamos para ayudarte.</p>
+
+          <a href="#" class="cta" style="display:inline-block; margin-top:10px;">Agendar nueva cita</a>
         """
 
     def _generate_text_version(self, context: Dict[str, Any]) -> str:
@@ -420,26 +464,145 @@ class AppointmentCancellationTemplate(EmailTemplate):
 
         warning_text = ""
         if cancelacion_tardia:
-            warning_text = "\n⚠️ CANCELACIÓN TARDÍA: Esta cita fue cancelada con menos de 4 horas de anticipación.\n"
+            warning_text = "\n⚠️ CANCELACIÓN TARDÍA: Esta cancelación ocurrió con menos de 4 horas de anticipación.\n"
 
-        return f"""
-CITA CANCELADA
+        return f"""Cita cancelada
 
 Hola {propietario_nombre},
 
 La cita de {mascota_nombre} ha sido cancelada.
-
-- Mascota: {mascota_nombre}
 - Fecha cancelada: {fecha_hora}
 {warning_text}
-Si deseas agendar una nueva cita, contáctanos en cualquier momento.
+Si deseas agendar una nueva cita, contáctanos.
 
 {self.brand_name}
 {self.support_email} | {self.phone_number}
 """
 
 
-# ==================== FUNCIÓN AUXILIAR ====================
+# -------------------- Plantillas adicionales (no invasivas) --------------------
+
+
+class AppointmentStartedTemplate(EmailTemplate):
+    """
+    Notificación: la cita ha sido iniciada
+    """
+
+    def get_subject(self, context: Dict[str, Any]) -> str:
+        return f"▶️ Cita iniciada - {context.get('mascota_nombre', 'Mascota')}"
+
+    def get_body(self, context: Dict[str, Any]) -> str:
+        mascota_nombre = context.get("mascota_nombre", self.MSG_MASCOTA)
+        propietario_nombre = context.get("propietario_nombre", "Cliente")
+        fecha_hora = context.get("fecha_hora", "")
+        veterinario_nombre = context.get("veterinario_nombre", self.MSG_DOCTORA)
+
+        return f"""
+          <div class="hero" style="margin-bottom:12px;">
+            <div class="badge" style="background:#ecfeff;">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <path d="M5 12h14" stroke="#06b6d4" stroke-width="1.6" stroke-linecap="round"/>
+                <path d="M12 5v14" stroke="#06b6d4" stroke-width="1.6" stroke-linecap="round"/>
+              </svg>
+            </div>
+            <div>
+              <h2 style="margin:0 0 6px 0; font-size:18px;">Tu cita ha comenzado</h2>
+              <p class="muted" style="margin:0;">Hola <strong>{propietario_nombre}</strong>, la atención ha comenzado.</p>
+            </div>
+          </div>
+
+          <div class="info-box">
+            <div class="info-row" style="margin-top:6px;">
+              {_svg_huellita(size=18, fill='#2563eb')}
+              <div style="font-size:14px;"><strong>Mascota:</strong>&nbsp;{mascota_nombre}</div>
+            </div>
+            <div class="info-row">
+              {_svg_calendario(size=18, fill='#2563eb')}
+              <div style="font-size:14px;"><strong>Hora:</strong>&nbsp;{fecha_hora}</div>
+            </div>
+          </div>
+        """
+
+    def _generate_text_version(self, context: Dict[str, Any]) -> str:
+        mascota_nombre = context.get("mascota_nombre", self.MSG_MASCOTA)
+        propietario_nombre = context.get("propietario_nombre", "Cliente")
+        fecha_hora = context.get("fecha_hora", "")
+
+        return f"""Cita iniciada
+
+Hola {propietario_nombre},
+
+La atención para {mascota_nombre} ha comenzado a las {fecha_hora}.
+
+{self.brand_name}
+{self.support_email} | {self.phone_number}
+"""
+
+
+class AppointmentCompletedTemplate(EmailTemplate):
+    """
+    Notificación: la cita fue completada
+    """
+
+    def get_subject(self, context: Dict[str, Any]) -> str:
+        return f"✅ Cita completada - {context.get('mascota_nombre', 'Mascota')}"
+
+    def get_body(self, context: Dict[str, Any]) -> str:
+        mascota_nombre = context.get("mascota_nombre", self.MSG_MASCOTA)
+        propietario_nombre = context.get("propietario_nombre", "Cliente")
+        fecha_hora = context.get("fecha_hora", "")
+        resumen = context.get("resumen", context.get("motivo", "Consulta completada"))
+
+        return f"""
+          <div class="hero" style="margin-bottom:12px;">
+            <div class="badge" style="background:#ecfdf5;">
+              {_svg_check(size=32, fill='#10b981')}
+            </div>
+            <div>
+              <h2 style="margin:0 0 6px 0; font-size:18px;">Cita completada</h2>
+              <p class="muted" style="margin:0;">Hola <strong>{propietario_nombre}</strong>, la atención ha finalizado.</p>
+            </div>
+          </div>
+
+          <div class="info-box">
+            <div class="info-row" style="margin-top:6px;">
+              {_svg_huellita(size=18, fill='#2563eb')}
+              <div style="font-size:14px;"><strong>Mascota:</strong>&nbsp;{mascota_nombre}</div>
+            </div>
+
+            <div class="info-row" style="margin-top:6px;">
+              {_svg_calendario(size=18, fill='#2563eb')}
+              <div style="font-size:14px;"><strong>Fecha:</strong>&nbsp;{fecha_hora}</div>
+            </div>
+
+            <div style="margin-top:8px; font-size:14px;"><strong>Resumen:</strong>&nbsp;{resumen}</div>
+          </div>
+
+          <p style="margin-top:10px;">Si lo deseas, puedes solicitar el historial o próximas recomendaciones desde tu cuenta.</p>
+
+          <a href="#" class="cta" style="display:inline-block; margin-top:10px;">Ver historial</a>
+        """
+
+    def _generate_text_version(self, context: Dict[str, Any]) -> str:
+        mascota_nombre = context.get("mascota_nombre", self.MSG_MASCOTA)
+        propietario_nombre = context.get("propietario_nombre", "Cliente")
+        fecha_hora = context.get("fecha_hora", "")
+        resumen = context.get("resumen", context.get("motivo", "Consulta completada"))
+
+        return f"""Cita completada
+
+Hola {propietario_nombre},
+
+La atención de {mascota_nombre} ha finalizado.
+Fecha: {fecha_hora}
+Resumen: {resumen}
+
+{self.brand_name}
+{self.support_email} | {self.phone_number}
+"""
+
+
+# ==================== FUNCIÓN AUXILIAR / FACTORY ====================
 
 def get_email_template(template_name: str) -> EmailTemplate:
     """
@@ -451,18 +614,23 @@ def get_email_template(template_name: str) -> EmailTemplate:
             - "appointment_reminder"
             - "appointment_reschedule"
             - "appointment_cancellation"
-
     Returns:
         EmailTemplate correspondiente
 
     Raises:
         ValueError: Si la plantilla no existe
     """
+
     templates = {
+        # Plantillas originales (mantener exactamente las keys para compatibilidad)
         "appointment_confirmation": AppointmentConfirmationTemplate,
         "appointment_reminder": AppointmentReminderTemplate,
         "appointment_reschedule": AppointmentRescheduleTemplate,
-        "appointment_cancellation": AppointmentCancellationTemplate
+        "appointment_cancellation": AppointmentCancellationTemplate,
+
+        # Plantillas adicionales (opcionalmente utilizadas)
+        "appointment_started": AppointmentStartedTemplate,
+        "appointment_completed": AppointmentCompletedTemplate,
     }
 
     template_class = templates.get(template_name)
