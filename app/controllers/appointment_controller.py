@@ -584,7 +584,7 @@ async def add_prioridad_decorator(
 async def get_appointment_decorators(
         appointment_id: UUID,
         db: Session = Depends(get_db),
-        current_user: User = Depends(require_staff)
+        current_user: User = Depends(get_current_active_user)
 ):
     """
     Obtiene todos los decoradores de una cita
@@ -594,6 +594,7 @@ async def get_appointment_decorators(
     """
     try:
         from app.services.decorators import get_cita_con_decoradores
+        from app.models.pet import  Pet
 
         appointment_service = AppointmentService(db)
         appointment = appointment_service.get_appointment_by_id(appointment_id)

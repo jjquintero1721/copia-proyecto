@@ -470,14 +470,30 @@ def get_cita_con_decoradores(
         "notas": appointment.notas
     }
 
-    # Cargar decoradores
-    decoradores = cargar_decoradores_de_cita(appointment, db)
+    # Cargar decoradores desde la BD
+    decoradores_db = db.query(AppointmentDecoratorModel).filter(
+        AppointmentDecoratorModel.cita_id == appointment.id,
+        AppointmentDecoratorModel.activo == "activo"
+    ).all()
 
-    # Agregar información de cada decorador
+    # Serializar decoradores con metadatos completos
     detalles_decoradores = []
-    for decorator in decoradores:
-        detalles_decoradores.append(decorator.get_detalles())
+    for decorator_model in decoradores_db:
+        decorador_serializado = {
+            "id": str(decorator_model.id),
+            "cita_id": str(decorator_model.cita_id),
+            "tipo_decorador": decorator_model.tipo_decorador.value,  # 'recordatorio', 'notas_especiales', 'prioridad'
+            "configuracion": decorator_model.configuracion,
+            "activo": decorator_model.activo,
+            "fecha_creacion": decorator_model.fecha_creacion.isoformat() if decorator_model.fecha_creacion else None,
+            "creado_por": str(decorator_model.creado_por) if decorator_model.creado_por else None
+        }
+        detalles_decoradores.append(decorador_serializado)
 
     detalles_base["decoradores"] = detalles_decoradores
+
+    logger.info(
+        f"📦 Serializados {len(detalles_decoradores)} decoradores para cita {appointment.id}"
+    )
 
     return detalles_base
