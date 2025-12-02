@@ -19,7 +19,7 @@ class PetCreate(BaseModel):
     raza: Optional[str] = Field(None, max_length=120)  # Raza de la mascota (opcional)
     color: Optional[str] = Field(None, max_length=60)
     sexo: str = Field(..., min_length=3, max_length=20)
-    peso: Optional[float] = None
+    peso: Optional[float] = Field(default=None, gt=0)
     microchip: Optional[str] = Field(None, max_length=60)  # Código del microchip (opcional)
     fecha_nacimiento: Optional[date] = None  # Fecha de nacimiento (opcional)
 

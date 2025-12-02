@@ -167,7 +167,7 @@ async def health_db_check():
         return JSONResponse(status_code=503, content={"status": "unhealthy", "database": "error", "detail": str(e)})
 
 # Health check endpoint
-@app.get("/health")
+@app.get("/api/health", tags=["Health"])
 async def health_check():
     """
     Endpoint para verificar el estado de salud de la aplicación
@@ -179,7 +179,6 @@ async def health_check():
             "version": os.getenv("APP_VERSION", "1.0.0")
         }
     )
-
 
 # Event handlers
 @app.on_event("startup")

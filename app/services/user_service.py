@@ -8,7 +8,7 @@ from sqlite3 import IntegrityError
 from sqlalchemy.orm import Session
 from typing import Optional, List, Dict, Any
 from uuid import UUID
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from abc import ABC, abstractmethod
 
 from app.models.user import User, UserRole
@@ -296,11 +296,43 @@ class UserService:
         if not user:
             return None
 
+        if user.bloqueado_hasta:
+            ahora = datetime.now(timezone.utc)
+
+            if user.bloqueado_hasta > ahora:
+                tiempo_restante = (user.bloqueado_hasta - ahora).total_seconds() / 60
+                raise ValueError(
+                    f"Cuenta bloqueada por intentos fallidos. "
+                    f"Intenta nuevamente en {int(tiempo_restante)} minutos."
+                )
+            else:
+                # ✅ El bloqueo expiró, resetear campos
+                user.bloqueado_hasta = None
+                user.intentos_fallidos = 0
+                self.user_repository.update(user)
+
         if not user.activo:
             raise ValueError("Usuario desactivado")
 
         if not verify_password(contrasena, user.contrasena_hash):
+            user.intentos_fallidos += 1
+
+            if user.intentos_fallidos >= 5:
+                user.bloqueado_hasta = datetime.now(timezone.utc) + timedelta(minutes=15)
+                self.user_repository.update(user)
+
+                raise ValueError(
+                    "Cuenta bloqueada por 5 intentos fallidos consecutivos. "
+                    "Intenta nuevamente en 15 minutos."
+                )
+
+            self.user_repository.update(user)
             return None
+
+        if user.intentos_fallidos > 0:
+            user.intentos_fallidos = 0
+            user.bloqueado_hasta = None
+            self.user_repository.update(user)
 
         token = create_access_token({
             "sub": user.correo,

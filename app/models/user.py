@@ -4,7 +4,7 @@ Roles: superadmin, veterinario, auxiliar, propietario
 CORRECCIÓN ARQUITECTURAL: Relación 1:1 con Owner cuando rol=propietario
 """
 
-from sqlalchemy import Column, String, Boolean, DateTime, Enum as SQLEnum, ForeignKey
+from sqlalchemy import Column, String, Boolean, DateTime, Enum as SQLEnum, ForeignKey, Integer
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from datetime import datetime, timezone
@@ -45,6 +45,14 @@ class User(Base):
     contrasena_hash = Column(String(255), nullable=False)
     rol = Column(SQLEnum(UserRole), nullable=False)
     activo = Column(Boolean, default=True, nullable=False)
+
+    # Control de bloqueo por intentos fallidos (RN05)
+    intentos_fallidos = Column(Integer, default=0, nullable=False)
+    bloqueado_hasta = Column(
+        DateTime(timezone=True),
+        nullable=True,
+        comment="Timestamp hasta cuando la cuenta está bloqueada (RN05)"
+    )
 
     veterinario_encargado_id = Column(
         UUID(as_uuid=True),

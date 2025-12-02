@@ -78,6 +78,8 @@ class CreatePetService(CreateTemplate):
         # 2. Validar duplicado
         if self.repo.exists_duplicate(self.propietario_id, self.nombre, self.microchip):
             raise ValueError("Ya existe una mascota con el mismo nombre para el propietario o microchip duplicado")
+        if self.peso is not None and self.peso <= 0:
+            raise ValueError("El peso debe ser mayor a 0")
 
     def prepare(self) -> Pet:
         """

@@ -6,7 +6,6 @@ Implementa el patrón Singleton para mantener una única instancia de conexión
 from sqlalchemy import create_engine, event
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import NullPool
 import os
 from dotenv import load_dotenv
 
@@ -33,39 +32,50 @@ class DatabaseConnection:
         """
         Inicializa la conexión a la base de datos PostgreSQL
         """
-        # Obtener configuración desde variables de entorno
-        DB_USER = os.getenv("DB_USER", "postgres")
-        DB_PASSWORD = os.getenv("DB_PASSWORD", "")
-        DB_HOST = os.getenv("DB_HOST", "localhost")
-        DB_PORT = os.getenv("DB_PORT", "5432")
-        DB_NAME = os.getenv("DB_NAME", "gdcv")
 
-        # URL de conexión para PostgreSQL
-        DATABASE_URL = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+        # Render usa exclusivamente DATABASE_URL
+        DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
+
+        if not DATABASE_URL:
+            # Fallback a variables sueltas (útil para local o setups previos)
+            DB_USER = os.getenv("DB_USER", "postgres").strip()
+            DB_PASSWORD = os.getenv("DB_PASSWORD", "").strip()
+            DB_HOST = os.getenv("DB_HOST", "localhost").strip()
+            DB_PORT = os.getenv("DB_PORT", "5432").strip()
+            DB_NAME = os.getenv("DB_NAME", "gdcv").strip()
+
+            # Si DB_PORT no es un número, ignorarlo (dejamos que postgresql use 5432 por defecto)
+            if DB_PORT == "" or not DB_PORT.isdigit():
+                DATABASE_URL = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}/{DB_NAME}"
+            else:
+                DATABASE_URL = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+
+            print("ℹ️ Usando DATABASE_URL construido desde variables sueltas:", DATABASE_URL)
+        else:
+            print("ℹ️ Usando DATABASE_URL desde el entorno.")
+
+            # Validación final
+        if not DATABASE_URL:
+            raise ValueError(
+                "❌ ERROR: La variable de entorno DATABASE_URL no está definida y no se pudo construir desde DB_*")
 
         # Configuración del engine
         engine_config = {
-            "pool_pre_ping": True,  # Verificar conexión antes de usar
-            "pool_size": 10,  # Tamaño del pool de conexiones
-            "max_overflow": 20,  # Conexiones adicionales permitidas
-            "pool_recycle": 3600,  # Reciclar conexiones cada hora
-            "echo": os.getenv("DEBUG", "False") == "True"  # Log de SQL en modo debug
+            "pool_pre_ping": True,
+            "pool_size": 10,
+            "max_overflow": 20,
+            "pool_recycle": 3600,
+            "echo": os.getenv("DEBUG", "False") == "True"
         }
 
-        # Crear engine con configuración
         self._engine = create_engine(
             DATABASE_URL,
-            connect_args={
-                "options": "-c client_encoding=UTF8",
-                "application_name": "GDCV"
-            },
+            connect_args={"application_name": "GDCV"},
             **engine_config
         )
 
-        # Configurar eventos de PostgreSQL
         self._configure_postgresql_events()
 
-        # Crear SessionLocal para manejo de sesiones
         self._session_local = sessionmaker(
             autocommit=False,
             autoflush=False,
@@ -75,17 +85,9 @@ class DatabaseConnection:
         print("✅ Conexión a base de datos PostgreSQL establecida")
 
     def _configure_postgresql_events(self):
-        """
-        Configura eventos específicos de PostgreSQL para optimización
-        """
         @event.listens_for(self._engine, "connect")
         def receive_connect(dbapi_conn, connection_record):
-            """
-            Configuración al establecer conexión
-            """
-            # Configurar timezone a UTC
             cursor = dbapi_conn.cursor()
-            # Asegurar codificación UTF-8
             try:
                 cursor.execute("SET client_encoding TO 'UTF8'")
             except Exception:
@@ -94,62 +96,39 @@ class DatabaseConnection:
             cursor.close()
 
     def get_engine(self):
-        """Retorna el engine de SQLAlchemy"""
         return self._engine
 
     def get_session(self):
-        """Retorna una nueva sesión de base de datos"""
         return self._session_local()
 
     def close_connection(self):
-        """Cierra todas las conexiones del pool"""
         if self._engine:
             self._engine.dispose()
             print("🔌 Conexiones de base de datos cerradas")
 
 
-# Base para modelos SQLAlchemy
 Base = declarative_base()
-
-# Instancia única de la conexión
 db_connection = DatabaseConnection()
 
 
 def get_db():
-    """
-    Dependency para obtener sesión de base de datos en endpoints
-    Se cierra automáticamente después de cada request
-
-    Uso:
-        @app.get("/ejemplo")
-        def ejemplo(db: Session = Depends(get_db)):
-            # usar db aquí
-    """
     db = db_connection.get_session()
     try:
         yield db
-        db.commit()  # ← importante: confirmar transacciones abiertas
+        db.commit()
     except Exception:
-        db.rollback()  # ← evita que la sesión quede corrupta
+        db.rollback()
         raise
     finally:
         db.close()
 
 
 def init_db():
-    """
-    Inicializa las tablas en la base de datos
-    Debe ser llamado después de importar todos los modelos
-    """
     Base.metadata.create_all(bind=db_connection.get_engine())
     print("✅ Tablas de base de datos creadas/verificadas")
 
 
 def drop_all_tables():
-    """
-    Elimina todas las tablas (solo para desarrollo/testing)
-    ⚠️ USAR CON PRECAUCIÓN
-    """
     if os.getenv("ENVIRONMENT") != "production":
         Base.metadata.drop_all(bind=db_connection.get_engine())
         print("⚠️ Todas las tablas han sido eliminadas")

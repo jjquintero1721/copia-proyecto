@@ -137,11 +137,34 @@ async def login(
             message="Login exitoso"
         )
 
+
     except ValueError as exc:
+
+        error_msg = str(exc)
+
+        # ✅ RN05: Cuenta bloqueada (429 Too Many Requests)
+
+        if "bloqueada" in error_msg.lower():
+            logger.warning(f"🔒 Cuenta bloqueada: {credentials.correo}")
+
+            raise HTTPException(
+
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+
+                detail=error_msg
+
+            )
+
+        # Usuario desactivado (403 Forbidden)
+
         logger.warning(f"❌ Usuario desactivado: {credentials.correo}")
+
         raise HTTPException(
+
             status_code=status.HTTP_403_FORBIDDEN,
-            detail=str(exc)
+
+            detail=error_msg
+
         )
     except HTTPException:
         raise
@@ -151,3 +174,43 @@ async def login(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error en el login: {str(exc)}"
         )
+
+@router.post("/reset-password", response_model=dict)
+async def reset_password(data: dict, db: Session = Depends(get_db)):
+    """
+    Restablecer contraseña SIN estar autenticado.
+    Flujo:
+      - Usuario escribe correo en login
+      - Sistema valida que exista
+      - Usuario escribe nueva contraseña y confirmación
+    """
+    correo = data.get("correo")
+    nueva = data.get("nueva_contrasena")
+    confirmar = data.get("confirmar")
+
+    if not correo or not nueva or not confirmar:
+        raise HTTPException(status_code=400, detail="Campos incompletos")
+
+    if nueva != confirmar:
+        raise HTTPException(status_code=400, detail="Las contraseñas no coinciden")
+
+    # Validaciones de fortaleza
+    if len(nueva) < 8:
+        raise HTTPException(status_code=400, detail="La contraseña debe tener mínimo 8 caracteres")
+
+    user_service = UserService(db)
+    user = user_service.get_user_by_correo(correo)
+
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+
+    # Cambiar contraseña directamente
+    from app.security.auth import get_password_hash
+    user.contrasena_hash = get_password_hash(nueva)
+    db.commit()
+    db.refresh(user)
+
+    return success_response(
+        data={"correo": correo},
+        message="Contraseña restablecida exitosamente"
+    )
